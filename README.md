@@ -32,6 +32,15 @@ npm run preview # serves the production build locally
 npm run lint
 ```
 
+## Environment setup
+- Copy the sample env file: `cp .env.example .env`
+- Required keys (all `VITE_` so Vite exposes them to the client bundle):
+  - `VITE_SUPABASE_URL` – Supabase project URL for auth/data.
+  - `VITE_SUPABASE_ANON_KEY` – Supabase anon/public key for the client SDK.
+  - `VITE_STRIPE_PK` – Stripe publishable key for checkout/payment flows.
+  - `VITE_API_BASE` – Base URL for your backend/worker API.
+- `vite.config.ts` loads `dotenv` plus `loadEnv`; runtime code reads from `import.meta.env` via `src/lib/config.ts`. Empty strings are allowed when a service is not configured.
+
 ## Project structure
 - `src/App.tsx` – app shell with theme, query client, routing.
 - `src/pages/Index.tsx` – root route; renders `AppLayout`.
@@ -39,6 +48,7 @@ npm run lint
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
+- `src/lib/config.ts` – typed access to env vars with safe fallbacks.
 - `src/index.css` – Tailwind tokens/base.
 
 ## Deployment
