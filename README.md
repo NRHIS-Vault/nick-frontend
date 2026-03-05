@@ -46,10 +46,17 @@ npm run lint
 - `src/pages/Index.tsx` – root route; renders `AppLayout`.
 - `src/components/AppLayout.tsx` – main dashboard frame and navigation.
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
+- `src/contexts/ThemeContext.tsx` – light/dark theme state, root class toggling, and localStorage persistence.
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
 - `src/lib/config.ts` – typed access to env vars with safe fallbacks.
 - `src/index.css` – Tailwind tokens/base.
+
+## Theming
+- Tokens are defined in `src/index.css` (light + dark) and surfaced through `tailwind.config.ts` (`background`, `foreground`, `card`, `surface`, `brand`, `primary`, etc.).
+- `ThemeProvider` from `src/contexts/ThemeContext.tsx` wraps the app in `AppLayout.tsx`; it applies the root `light`/`dark` class and saves the choice to `localStorage`.
+- The top navigation includes a Sun/Moon toggle (desktop + mobile) and the layout/components now use token-based classes (`bg-card`, `text-muted-foreground`, `bg-primary`, `bg-surface-muted`) instead of fixed grays/blues.
+- To add new theme tokens, declare CSS variables in `index.css`, expose them under `theme.extend.colors` in `tailwind.config.ts`, and reference them with Tailwind classes rather than hex values.
 
 ## Deployment
 - Static SPA build; deployable to Cloudflare Pages or any static host. Build command: `npm run build`; publish `dist/`.

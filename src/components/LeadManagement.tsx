@@ -59,12 +59,12 @@ const LeadManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'New': return 'bg-blue-900 text-blue-300';
-      case 'Contacted': return 'bg-yellow-900 text-yellow-300';
-      case 'Quoted': return 'bg-purple-900 text-purple-300';
-      case 'Approved': return 'bg-green-900 text-green-300';
-      case 'Completed': return 'bg-gray-700 text-gray-300';
-      default: return 'bg-gray-700 text-gray-300';
+      case 'New': return 'bg-primary/15 text-primary';
+      case 'Contacted': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-100';
+      case 'Quoted': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-100';
+      case 'Approved': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-100';
+      case 'Completed': return 'bg-surface-muted text-muted-foreground';
+      default: return 'bg-surface-muted text-muted-foreground';
     }
   };
 
@@ -79,8 +79,8 @@ const LeadManagement: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h2 className="text-2xl font-bold text-white">Lead Management</h2>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <h2 className="text-2xl font-bold text-foreground">Lead Management</h2>
+        <button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
           <Plus size={16} />
           Add Lead
         </button>
@@ -89,19 +89,19 @@ const LeadManagement: React.FC = () => {
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
           <input
             type="text"
             placeholder="Search leads..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-surface-muted border border-border rounded-lg text-foreground focus:border-primary focus:outline-none"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+          className="px-4 py-2 bg-surface-muted border border-border rounded-lg text-foreground focus:border-primary focus:outline-none"
         >
           <option value="All">All Status</option>
           <option value="New">New</option>
@@ -115,11 +115,11 @@ const LeadManagement: React.FC = () => {
       {/* Leads Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredLeads.map((lead) => (
-          <div key={lead.id} className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
+          <div key={lead.id} className="bg-card rounded-lg p-6 border border-border hover:border-primary/50 transition-colors shadow-sm">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-white font-semibold text-lg">{lead.name}</h3>
-                <p className="text-gray-400 text-sm">{lead.service}</p>
+                <h3 className="text-foreground font-semibold text-lg">{lead.name}</h3>
+                <p className="text-muted-foreground text-sm">{lead.service}</p>
               </div>
               <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(lead.status)}`}>
                 {lead.status}
@@ -127,37 +127,37 @@ const LeadManagement: React.FC = () => {
             </div>
 
             <div className="space-y-3 mb-4">
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Phone size={14} />
                 {lead.phone}
               </div>
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Mail size={14} />
                 {lead.email}
               </div>
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <MapPin size={14} />
                 {lead.location}
               </div>
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <DollarSign size={14} />
                 ${lead.value.toLocaleString()}
               </div>
-              <div className="flex items-center gap-2 text-gray-300 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Calendar size={14} />
                 {lead.date.toLocaleDateString()}
               </div>
             </div>
 
             <div className="mb-4">
-              <p className="text-gray-400 text-sm">{lead.notes}</p>
+              <p className="text-muted-foreground text-sm">{lead.notes}</p>
             </div>
 
             <div className="flex gap-2">
-              <button className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+              <button className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm">
                 Contact
               </button>
-              <button className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
+              <button className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-sm">
                 Quote
               </button>
             </div>
@@ -167,7 +167,7 @@ const LeadManagement: React.FC = () => {
 
       {filteredLeads.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-400">No leads found matching your criteria.</p>
+          <p className="text-muted-foreground">No leads found matching your criteria.</p>
         </div>
       )}
     </div>
