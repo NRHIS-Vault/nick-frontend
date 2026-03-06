@@ -21,6 +21,19 @@ npm run dev
 ```
 Open the URL Vite prints (default http://localhost:5173).
 
+## Routing
+- `/` and `/dashboard` – `BusinessDashboard` (default view) wrapped in the `ProtectedRoute` stub.
+- `/trading` – `TradingBot`
+- `/leadbot` – `LeadBot`
+- `/portal` – `CustomerPortal`
+- `/rhnis` – `RHNISIdentity`
+- `/businesses` – `BusinessCards`
+- `/leads` – `LeadManagement`
+- `/workers` – `WorkerControl`
+- `/chat` – Nick chat surface (avatar header + `ChatInterface`)
+- `/settings` – placeholder settings panel (ready for future auth/data)
+- `*` – `NotFound` accessible 404 with dashboard/chat recovery links.
+
 ## Build & preview
 ```bash
 npm run build   # outputs dist/
@@ -42,10 +55,12 @@ npm run lint
 - `vite.config.ts` loads `dotenv` plus `loadEnv`; runtime code reads from `import.meta.env` via `src/lib/config.ts`. Empty strings are allowed when a service is not configured.
 
 ## Project structure
-- `src/App.tsx` – app shell with theme, query client, routing.
-- `src/pages/Index.tsx` – root route; renders `AppLayout`.
-- `src/components/AppLayout.tsx` – main dashboard frame and navigation.
+- `src/App.tsx` – app shell with theme, query client, and nested routes per panel.
+- `src/pages/Index.tsx` – wraps `AppLayout` with `AppProvider` for layout state.
+- `src/components/AppLayout.tsx` – main dashboard frame, Link-based navigation, and `<Outlet>` for child routes.
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
+- `src/routes/ProtectedRoute.tsx` – stub guard that currently returns children; drop in auth checks later.
+- `src/pages/NotFound.tsx` – accessible 404 with recovery links back to the dashboard or chat.
 - `src/contexts/ThemeContext.tsx` – light/dark theme state, root class toggling, and localStorage persistence.
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
