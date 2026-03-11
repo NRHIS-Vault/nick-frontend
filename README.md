@@ -65,6 +65,7 @@ npm run lint
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
 - `src/lib/config.ts` – typed access to env vars with safe fallbacks.
+- `src/lib/supabaseClient.ts` – singleton Supabase client plus auth/profile helpers.
 - `src/index.css` – Tailwind tokens/base.
 
 ## Theming
@@ -76,3 +77,11 @@ npm run lint
 ## Deployment
 - Static SPA build; deployable to Cloudflare Pages or any static host. Build command: `npm run build`; publish `dist/`.
 - When wiring APIs/auth, surface needed env vars with `VITE_` prefixes and document them here.
+
+## Supabase client usage
+- Import the shared client from `src/lib/supabaseClient.ts`: `import { supabaseClient, getCurrentUser, getUserProfile, updateProfile } from "@/lib/supabaseClient";`
+- The client is a singleton so auth state (refresh tokens, realtime sockets) stays consistent across tabs/components instead of being recreated per hook/component.
+- `getCurrentUser()` wraps `supabase.auth.getUser()` for quick session checks.
+- `getUserProfile(userId)` reads from the `profiles` table (adjust the table name/columns to match your schema).
+- `updateProfile(profile)` upserts into `profiles` and returns the saved row; pass at least an `id` along with any columns you want to update.
+- Ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set before importing the client; the helper throws early if they are missing to avoid silently misconfigured auth calls.
