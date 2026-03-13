@@ -1,73 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Play, Pause, Square, Settings, Activity, Clock, Cpu, AlertTriangle } from 'lucide-react';
+import { getWorkers, type WorkersResponse } from '@/lib/api';
 
-interface Worker {
-  id: string;
-  name: string;
-  type: 'automation' | 'monitoring' | 'processing';
-  status: 'running' | 'stopped' | 'error' | 'idle';
-  lastRun: Date;
-  nextRun?: Date;
-  description: string;
-  metrics: {
-    tasksCompleted: number;
-    successRate: number;
-    avgRunTime: string;
-  };
-}
+type Worker = WorkersResponse['workers'][number];
 
 const WorkerControl: React.FC = () => {
-  const [workers] = useState<Worker[]>([
-    {
-      id: '1',
-      name: 'Shopify Product Sync',
-      type: 'automation',
-      status: 'running',
-      lastRun: new Date('2024-01-15T14:30:00'),
-      nextRun: new Date('2024-01-15T15:30:00'),
-      description: 'Syncs products, inventory, and orders with EcoGen Market',
-      metrics: { tasksCompleted: 1247, successRate: 98.5, avgRunTime: '2.3s' }
-    },
-    {
-      id: '2',
-      name: 'Lead Generator',
-      type: 'automation',
-      status: 'running',
-      lastRun: new Date('2024-01-15T14:25:00'),
-      nextRun: new Date('2024-01-15T14:35:00'),
-      description: 'Processes fencing leads and sends auto-responses',
-      metrics: { tasksCompleted: 89, successRate: 100, avgRunTime: '1.8s' }
-    },
-    {
-      id: '3',
-      name: 'Social Media Bot',
-      type: 'automation',
-      status: 'idle',
-      lastRun: new Date('2024-01-15T12:00:00'),
-      nextRun: new Date('2024-01-15T18:00:00'),
-      description: 'Posts content and engages on social platforms',
-      metrics: { tasksCompleted: 45, successRate: 95.6, avgRunTime: '5.2s' }
-    },
-    {
-      id: '4',
-      name: 'System Monitor',
-      type: 'monitoring',
-      status: 'running',
-      lastRun: new Date('2024-01-15T14:32:00'),
-      nextRun: new Date('2024-01-15T14:33:00'),
-      description: 'Monitors system health and performance',
-      metrics: { tasksCompleted: 8640, successRate: 99.9, avgRunTime: '0.5s' }
-    },
-    {
-      id: '5',
-      name: 'Data Processor',
-      type: 'processing',
-      status: 'error',
-      lastRun: new Date('2024-01-15T14:20:00'),
-      description: 'Processes and analyzes business data',
-      metrics: { tasksCompleted: 234, successRate: 87.2, avgRunTime: '12.1s' }
-    }
-  ]);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['workers'],
+    queryFn: getWorkers,
+  });
+
+  const workers = data?.workers ?? [];
+  const summary = data?.summary ?? {
+    systemHealthPct: 0,
+    activeWorkers: 0,
+    totalWorkers: 0,
+    uptimePct: 0,
+    errors: 0,
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -98,6 +49,40 @@ const WorkerControl: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading workers...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
+        <p className="text-destructive mb-3">Could not load worker status.</p>
+        <button
+          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+          onClick={() => refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!workers.length) {
+    return (
+      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
+        No workers reported yet. Refresh to check again.
+        <div className="mt-3">
+          <button
+            className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            onClick={() => refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -105,7 +90,9 @@ const WorkerControl: React.FC = () => {
         <h2 className="text-2xl font-bold text-foreground">Nick Control System (NCS)</h2>
         <div className="flex items-center gap-2 text-sm">
           <Cpu className="text-primary" size={16} />
-          <span className="text-muted-foreground">5 Workers Active</span>
+          <span className="text-muted-foreground">
+            {summary.activeWorkers}/{summary.totalWorkers} Workers Active
+          </span>
         </div>
       </div>
 
@@ -116,28 +103,30 @@ const WorkerControl: React.FC = () => {
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-foreground font-medium">System Health</span>
           </div>
-          <p className="text-2xl font-bold text-emerald-500">98.5%</p>
+          <p className="text-2xl font-bold text-emerald-500">{summary.systemHealthPct}%</p>
         </div>
         <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <Activity className="text-primary" size={16} />
             <span className="text-foreground font-medium">Active Workers</span>
           </div>
-          <p className="text-2xl font-bold text-primary">3/5</p>
+          <p className="text-2xl font-bold text-primary">
+            {summary.activeWorkers}/{summary.totalWorkers}
+          </p>
         </div>
         <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="text-purple-500" size={16} />
             <span className="text-foreground font-medium">Uptime</span>
           </div>
-          <p className="text-2xl font-bold text-purple-500">99.9%</p>
+          <p className="text-2xl font-bold text-purple-500">{summary.uptimePct}%</p>
         </div>
         <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="text-red-400" size={16} />
             <span className="text-foreground font-medium">Errors</span>
           </div>
-          <p className="text-2xl font-bold text-red-500">1</p>
+          <p className="text-2xl font-bold text-red-500">{summary.errors}</p>
         </div>
       </div>
 
@@ -170,11 +159,11 @@ const WorkerControl: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Avg Runtime</p>
-                    <p className="text-foreground font-semibold">{worker.metrics.avgRunTime}</p>
+                    <p className="text-foreground font-semibold">{worker.metrics.avgRunTimeSeconds}s</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Last Run</p>
-                    <p className="text-foreground font-semibold">{worker.lastRun.toLocaleTimeString()}</p>
+                    <p className="text-foreground font-semibold">{new Date(worker.lastRun).toLocaleTimeString()}</p>
                   </div>
                 </div>
               </div>
@@ -198,7 +187,7 @@ const WorkerControl: React.FC = () => {
             {worker.nextRun && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock size={14} />
-                Next run: {worker.nextRun.toLocaleString()}
+                Next run: {new Date(worker.nextRun).toLocaleString()}
               </div>
             )}
           </div>

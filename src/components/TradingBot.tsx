@@ -1,63 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import { Progress } from './ui/progress';
 import { TrendingUp, TrendingDown, DollarSign, Activity, Zap, Target } from 'lucide-react';
+import { getTradingBotData, type TradingBotResponse } from '@/lib/api';
 
-interface Trade {
-  id: string;
-  pair: string;
-  type: 'BUY' | 'SELL';
-  amount: number;
-  price: number;
-  profit: number;
-  timestamp: Date;
-  status: 'OPEN' | 'CLOSED' | 'PENDING';
-}
-
-interface Signal {
-  pair: string;
-  direction: 'UP' | 'DOWN';
-  strength: number;
-  confidence: number;
-  timeframe: string;
-}
+type Trade = TradingBotResponse['trades'][number];
+type Signal = TradingBotResponse['signals'][number];
+type Platform = TradingBotResponse['platforms'][number];
 
 export default function TradingBot() {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['trading-bot'],
+    queryFn: getTradingBotData,
+  });
+
   const [isActive, setIsActive] = useState(false);
-  const [balance, setBalance] = useState(25847.32);
-  const [dailyProfit, setDailyProfit] = useState(1247.85);
-  const [winRate, setWinRate] = useState(78.5);
-  const [activeTrades, setActiveTrades] = useState<Trade[]>([
-    { id: '1', pair: 'BTC/USDT', type: 'BUY', amount: 0.5, price: 43250, profit: 125.50, timestamp: new Date(), status: 'OPEN' },
-    { id: '2', pair: 'ETH/USDT', type: 'SELL', amount: 2.1, price: 2650, profit: -45.20, timestamp: new Date(), status: 'OPEN' },
-    { id: '3', pair: 'ADA/USDT', type: 'BUY', amount: 1000, price: 0.45, profit: 78.90, timestamp: new Date(), status: 'OPEN' }
-  ]);
 
-  const [signals, setSignals] = useState<Signal[]>([
-    { pair: 'BTC/USDT', direction: 'UP', strength: 85, confidence: 92, timeframe: '1H' },
-    { pair: 'ETH/USDT', direction: 'DOWN', strength: 72, confidence: 88, timeframe: '4H' },
-    { pair: 'SOL/USDT', direction: 'UP', strength: 68, confidence: 75, timeframe: '15M' }
-  ]);
-
-  const [platforms] = useState([
-    { name: 'Binance', status: 'connected', balance: 15420.50 },
-    { name: 'Coinbase', status: 'connected', balance: 8926.82 },
-    { name: 'KuCoin', status: 'disconnected', balance: 1500.00 }
-  ]);
+  const balances = data?.balances ?? { totalBalance: 0, dailyProfit: 0, winRate: 0 };
+  const trades = data?.trades ?? [];
+  const signals = data?.signals ?? [];
+  const platforms = data?.platforms ?? [];
+  const openTrades = trades.filter((trade) => trade.status === 'OPEN');
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (isActive) {
-        // Simulate real-time updates
-        setBalance(prev => prev + (Math.random() - 0.4) * 50);
-        setDailyProfit(prev => prev + (Math.random() - 0.3) * 20);
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [isActive]);
+    if (data?.botStatus) {
+      setIsActive(data.botStatus.active);
+    }
+  }, [data?.botStatus]);
+
+  if (isLoading) {
+    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading TradingBot data...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
+        <p className="text-destructive mb-3">Could not load trading data.</p>
+        <Button onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
+
+  if (!trades.length && !signals.length && !platforms.length) {
+    return (
+      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
+        No trading data available yet. Try refreshing.
+        <div className="mt-3">
+          <Button onClick={() => refetch()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -80,7 +77,7 @@ export default function TradingBot() {
               <DollarSign className="h-5 w-5 text-green-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Total Balance</p>
-                <p className="text-2xl font-bold">${balance.toFixed(2)}</p>
+                <p className="text-2xl font-bold">${balances.totalBalance.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -92,7 +89,7 @@ export default function TradingBot() {
               <TrendingUp className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Daily P&L</p>
-                <p className="text-2xl font-bold text-green-500">+${dailyProfit.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-500">+${balances.dailyProfit.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -104,7 +101,7 @@ export default function TradingBot() {
               <Target className="h-5 w-5 text-purple-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Win Rate</p>
-                <p className="text-2xl font-bold">{winRate}%</p>
+                <p className="text-2xl font-bold">{balances.winRate}%</p>
               </div>
             </div>
           </CardContent>
@@ -116,7 +113,7 @@ export default function TradingBot() {
               <Activity className="h-5 w-5 text-orange-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Active Trades</p>
-                <p className="text-2xl font-bold">{activeTrades.length}</p>
+                <p className="text-2xl font-bold">{openTrades.length}</p>
               </div>
             </div>
           </CardContent>
@@ -203,7 +200,7 @@ export default function TradingBot() {
                 </tr>
               </thead>
               <tbody>
-                {activeTrades.map((trade) => (
+                {openTrades.map((trade) => (
                   <tr key={trade.id} className="border-b">
                     <td className="p-2 font-medium">{trade.pair}</td>
                     <td className="p-2">

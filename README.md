@@ -5,7 +5,7 @@ Dashboard UI scaffold for the Nick AI platform: chat, lead gen, trading bot, wor
 ## Stack
 - Vite + React 18 + TypeScript
 - Tailwind CSS + shadcn/ui component set
-- TanStack Query (available for future data fetching)
+- TanStack Query (data fetching + caching for dashboard panels)
 - Supabase JS client present for future auth/data (not wired yet)
 - lucide-react icons
 
@@ -65,8 +65,14 @@ npm run lint
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
 - `src/lib/config.ts` – typed access to env vars with safe fallbacks.
+- `src/lib/api.ts` – lightweight fetch helpers for the dashboard mock APIs (business stats, leads, workers, cards, LeadBot, TradingBot, customer portal, RHNIS).
 - `src/lib/supabaseClient.ts` – singleton Supabase client plus auth/profile helpers.
 - `src/index.css` – Tailwind tokens/base.
+
+## API mocks
+- Cloudflare Pages Functions (in `nick-site/functions`) expose sample JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, `/rhnisIdentity`.
+- Components now use `@tanstack/react-query` + the helpers in `src/lib/api.ts` to fetch those routes, with built-in loading, empty, and error (retry) states.
+- Set `VITE_API_BASE` if the workers live on another domain; leave it blank to call them from the same origin during Pages previews.
 
 ## Theming
 - Tokens are defined in `src/index.css` (light + dark) and surfaced through `tailwind.config.ts` (`background`, `foreground`, `card`, `surface`, `brand`, `primary`, etc.).

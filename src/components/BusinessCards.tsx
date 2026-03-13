@@ -1,38 +1,61 @@
 import React from 'react';
-import { ExternalLink, TrendingUp, Users, MapPin } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ExternalLink, TrendingUp } from 'lucide-react';
+import { getBusinessCards } from '@/lib/api';
+
+const statusClass = (status: string) => {
+  if (status === 'Active') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-100';
+  if (status === 'Growing') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-100';
+  return 'bg-surface-muted text-muted-foreground';
+};
+
+const borderClass = (status: string) => {
+  if (status === 'Active') return 'border-emerald-400';
+  if (status === 'Growing') return 'border-amber-400';
+  return 'border-border';
+};
+
+const formatStatValue = (key: string, value: number | string) => {
+  if (typeof value !== 'number') return value;
+  return /revenue|quoted|amount/i.test(key)
+    ? `$${value.toLocaleString()}`
+    : value.toLocaleString();
+};
 
 const BusinessCards: React.FC = () => {
-  const businesses = [
-    {
-      name: 'EcoGen Market',
-      description: 'Global dropshipping store with AI-powered product research',
-      image: 'https://d64gsuwffb70l.cloudfront.net/68b924f79c49746e335d84b0_1756964139845_b445f52f.webp',
-      stats: { revenue: '$12,450', products: '2,340', customers: '890' },
-      status: 'Active',
-      color: 'border-emerald-400'
-    },
-    {
-      name: 'Real Fencing & Home Improvement',
-      description: 'Professional fencing services with automated lead generation',
-      image: 'https://d64gsuwffb70l.cloudfront.net/68b924f79c49746e335d84b0_1756964132851_80107075.webp',
-      stats: { leads: '23', quoted: '$45K', completed: '12' },
-      status: 'Active',
-      color: 'border-primary'
-    },
-    {
-      name: 'Island Bwoy',
-      description: 'Caribbean restaurant & natural juice factory',
-      image: 'https://d64gsuwffb70l.cloudfront.net/68b924f79c49746e335d84b0_1756964137192_06f138ba.webp',
-      stats: { orders: '156', revenue: '$8,920', rating: '4.8' },
-      status: 'Growing',
-      color: 'border-amber-400'
-    }
-  ];
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['business-cards'],
+    queryFn: getBusinessCards,
+  });
+
+  const businesses = data?.businesses ?? [];
+
+  if (isLoading) {
+    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading businesses...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
+        <p className="text-destructive mb-3">Could not load businesses.</p>
+        <button
+          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+          onClick={() => refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!businesses.length) {
+    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">No businesses to display yet.</div>;
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {businesses.map((business, index) => (
-        <div key={index} className={`bg-card rounded-lg overflow-hidden border-2 ${business.color} hover:shadow-lg transition-all duration-300`}>
+      {businesses.map((business) => (
+        <div key={business.id} className={`bg-card rounded-lg overflow-hidden border-2 ${borderClass(business.status)} hover:shadow-lg transition-all duration-300`}>
           <div className="relative h-48 overflow-hidden">
             <img 
               src={business.image} 
@@ -40,11 +63,7 @@ const BusinessCards: React.FC = () => {
               className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
             />
             <div className="absolute top-4 right-4">
-              <span className={`px-2 py-1 text-xs rounded-full ${
-                business.status === 'Active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-100' :
-                business.status === 'Growing' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-100' :
-                'bg-surface-muted text-muted-foreground'
-              }`}>
+              <span className={`px-2 py-1 text-xs rounded-full ${statusClass(business.status)}`}>
                 {business.status}
               </span>
             </div>
@@ -55,9 +74,9 @@ const BusinessCards: React.FC = () => {
             <p className="text-muted-foreground text-sm mb-4">{business.description}</p>
             
             <div className="grid grid-cols-3 gap-3 mb-4">
-              {Object.entries(business.stats).map(([key, value], statIndex) => (
-                <div key={statIndex} className="text-center">
-                  <p className="text-foreground font-semibold">{value}</p>
+              {Object.entries(business.stats).map(([key, value]) => (
+                <div key={key} className="text-center">
+                  <p className="text-foreground font-semibold">{formatStatValue(key, value)}</p>
                   <p className="text-muted-foreground text-xs capitalize">{key}</p>
                 </div>
               ))}

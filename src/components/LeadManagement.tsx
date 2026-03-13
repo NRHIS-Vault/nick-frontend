@@ -1,58 +1,17 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Phone, Mail, MapPin, Calendar, DollarSign, Filter, Search, Plus } from 'lucide-react';
+import { getLeads, type LeadManagementResponse } from '@/lib/api';
 
-interface Lead {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  service: string;
-  location: string;
-  value: number;
-  status: 'New' | 'Contacted' | 'Quoted' | 'Approved' | 'Completed';
-  date: Date;
-  notes: string;
-}
+type Lead = LeadManagementResponse['leads'][number];
 
 const LeadManagement: React.FC = () => {
-  const [leads] = useState<Lead[]>([
-    {
-      id: '1',
-      name: 'John Smith',
-      email: 'john@email.com',
-      phone: '(555) 123-4567',
-      service: 'Privacy Fence',
-      location: 'Miami, FL',
-      value: 2500,
-      status: 'New',
-      date: new Date('2024-01-15'),
-      notes: 'Needs 150ft privacy fence, cedar preferred'
-    },
-    {
-      id: '2',
-      name: 'Maria Garcia',
-      email: 'maria@email.com',
-      phone: '(555) 987-6543',
-      service: 'Chain Link',
-      location: 'Orlando, FL',
-      value: 1800,
-      status: 'Quoted',
-      date: new Date('2024-01-14'),
-      notes: 'Commercial property, 200ft chain link'
-    },
-    {
-      id: '3',
-      name: 'David Wilson',
-      email: 'david@email.com',
-      phone: '(555) 456-7890',
-      service: 'Vinyl Fence',
-      location: 'Tampa, FL',
-      value: 3200,
-      status: 'Approved',
-      date: new Date('2024-01-13'),
-      notes: 'White vinyl, 180ft with gates'
-    }
-  ]);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['lead-management'],
+    queryFn: getLeads,
+  });
+
+  const leads = data?.leads ?? [];
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -74,6 +33,44 @@ const LeadManagement: React.FC = () => {
     const matchesStatus = statusFilter === 'All' || lead.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  if (isLoading) {
+    return (
+      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
+        Loading leads...
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
+        <p className="text-destructive mb-3">Could not load leads.</p>
+        <button
+          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+          onClick={() => refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!leads.length) {
+    return (
+      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
+        No leads available yet. Click retry to fetch again.
+        <div className="mt-3">
+          <button
+            className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            onClick={() => refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -145,7 +142,7 @@ const LeadManagement: React.FC = () => {
               </div>
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Calendar size={14} />
-                {lead.date.toLocaleDateString()}
+                {new Date(lead.date).toLocaleDateString()}
               </div>
             </div>
 

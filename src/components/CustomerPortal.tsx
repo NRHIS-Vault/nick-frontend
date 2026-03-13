@@ -1,85 +1,60 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Crown, TrendingUp, Users, Zap, DollarSign, Star, CheckCircle } from 'lucide-react';
+import { getCustomerPortalData, type CustomerPortalResponse } from '@/lib/api';
 
-interface Service {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  period: 'monthly' | 'yearly';
-  features: string[];
-  popular?: boolean;
-  roi: string;
-}
-
-interface Subscriber {
-  id: string;
-  name: string;
-  email: string;
-  service: string;
-  joinDate: Date;
-  revenue: number;
-  status: 'active' | 'paused' | 'cancelled';
-}
+type Service = CustomerPortalResponse['services'][number];
+type Subscriber = CustomerPortalResponse['subscribers'][number];
 
 export default function CustomerPortal() {
   const [activeTab, setActiveTab] = useState('services');
-  const [totalRevenue, setTotalRevenue] = useState(45670.25);
-  const [activeSubscribers, setActiveSubscribers] = useState(127);
-  const [monthlyGrowth, setMonthlyGrowth] = useState(18.5);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['customer-portal'],
+    queryFn: getCustomerPortalData,
+  });
 
-  const services: Service[] = [
-    {
-      id: '1',
-      name: 'AI Trading Signals',
-      description: 'Get real-time trading signals powered by our advanced AI algorithms. Perfect for crypto and forex trading.',
-      price: 97,
-      period: 'monthly',
-      features: ['Real-time signals', '24/7 monitoring', 'Multiple platforms', 'Risk management', 'Mobile alerts'],
-      roi: '15-25% monthly',
-      popular: true
-    },
-    {
-      id: '2',
-      name: 'Lead Generation Pro',
-      description: 'Automated lead generation for your business using AI-powered social media campaigns.',
-      price: 197,
-      period: 'monthly',
-      features: ['Multi-platform posting', 'Lead tracking', 'CRM integration', 'Analytics dashboard', 'Custom campaigns'],
-      roi: '300-500% ROI'
-    },
-    {
-      id: '3',
-      name: 'RHNIS Identity Suite',
-      description: 'Complete digital identity system with voice recognition, avatar, and automation tools.',
-      price: 297,
-      period: 'monthly',
-      features: ['Digital avatar', 'Voice commands', 'Identity tracking', 'Legacy preservation', 'Device control'],
-      roi: 'Priceless digital legacy'
-    },
-    {
-      id: '4',
-      name: 'Full AI Ecosystem',
-      description: 'Complete access to all Nick AI services including trading, leads, and identity management.',
-      price: 497,
-      period: 'monthly',
-      features: ['All services included', 'Priority support', 'Custom integrations', 'Advanced analytics', 'White-label options'],
-      roi: '500-1000% ROI',
-      popular: true
-    }
-  ];
+  const services: Service[] = data?.services ?? [];
+  const subscribers: Subscriber[] = data?.subscribers ?? [];
+  const performance = data?.performance ?? [];
+  const revenueBreakdown = data?.revenueBreakdown ?? [];
+  const metrics = data?.metrics ?? {
+    monthlyRevenue: 0,
+    activeSubscribers: 0,
+    monthlyGrowth: 0,
+    rating: 0,
+  };
+  const revenueTotal = revenueBreakdown.length
+    ? revenueBreakdown.reduce((sum, entry) => sum + entry.amount, 0)
+    : metrics.monthlyRevenue;
 
-  const subscribers: Subscriber[] = [
-    { id: '1', name: 'Sarah Johnson', email: 'sarah@email.com', service: 'AI Trading Signals', joinDate: new Date('2024-01-15'), revenue: 485, status: 'active' },
-    { id: '2', name: 'Mike Chen', email: 'mike@email.com', service: 'Full AI Ecosystem', joinDate: new Date('2024-02-01'), revenue: 1491, status: 'active' },
-    { id: '3', name: 'Lisa Rodriguez', email: 'lisa@email.com', service: 'Lead Generation Pro', joinDate: new Date('2024-01-20'), revenue: 788, status: 'active' },
-    { id: '4', name: 'David Wilson', email: 'david@email.com', service: 'RHNIS Identity Suite', joinDate: new Date('2024-02-10'), revenue: 594, status: 'paused' }
-  ];
+  if (isLoading) {
+    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading customer portal data...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
+        <p className="text-destructive mb-3">Could not load customer portal data.</p>
+        <Button onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
+
+  if (!services.length && !subscribers.length) {
+    return (
+      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
+        No customer data available yet. Try refreshing.
+        <div className="mt-3">
+          <Button onClick={() => refetch()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -98,7 +73,7 @@ export default function CustomerPortal() {
               <DollarSign className="h-5 w-5 text-green-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Monthly Revenue</p>
-                <p className="text-2xl font-bold">${totalRevenue.toFixed(2)}</p>
+                <p className="text-2xl font-bold">${metrics.monthlyRevenue.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -110,7 +85,7 @@ export default function CustomerPortal() {
               <Users className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Active Subscribers</p>
-                <p className="text-2xl font-bold">{activeSubscribers}</p>
+                <p className="text-2xl font-bold">{metrics.activeSubscribers}</p>
               </div>
             </div>
           </CardContent>
@@ -122,7 +97,7 @@ export default function CustomerPortal() {
               <TrendingUp className="h-5 w-5 text-purple-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Growth Rate</p>
-                <p className="text-2xl font-bold">+{monthlyGrowth}%</p>
+                <p className="text-2xl font-bold">+{metrics.monthlyGrowth}%</p>
               </div>
             </div>
           </CardContent>
@@ -134,7 +109,7 @@ export default function CustomerPortal() {
               <Star className="h-5 w-5 text-yellow-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Avg Rating</p>
-                <p className="text-2xl font-bold">4.9/5</p>
+                <p className="text-2xl font-bold">{metrics.rating}/5</p>
               </div>
             </div>
           </CardContent>
@@ -223,7 +198,7 @@ export default function CustomerPortal() {
                           </div>
                         </td>
                         <td className="p-2">{subscriber.service}</td>
-                        <td className="p-2">{subscriber.joinDate.toLocaleDateString()}</td>
+                        <td className="p-2">{new Date(subscriber.joinDate).toLocaleDateString()}</td>
                         <td className="p-2 font-medium">${subscriber.revenue}</td>
                         <td className="p-2">
                           <Badge variant={
@@ -250,34 +225,18 @@ export default function CustomerPortal() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">AI Trading Signals</span>
-                      <span className="text-sm">45 subscribers</span>
+                  {performance.map((item) => (
+                    <div key={item.service}>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm">{item.service}</span>
+                        <span className="text-sm">{item.subscribers} subscribers</span>
+                      </div>
+                      <Progress value={item.progress} />
                     </div>
-                    <Progress value={75} />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">Lead Generation Pro</span>
-                      <span className="text-sm">32 subscribers</span>
-                    </div>
-                    <Progress value={55} />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">RHNIS Identity Suite</span>
-                      <span className="text-sm">28 subscribers</span>
-                    </div>
-                    <Progress value={45} />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">Full AI Ecosystem</span>
-                      <span className="text-sm">22 subscribers</span>
-                    </div>
-                    <Progress value={35} />
-                  </div>
+                  ))}
+                  {!performance.length && (
+                    <p className="text-sm text-muted-foreground">No performance data yet.</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -288,26 +247,19 @@ export default function CustomerPortal() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span>AI Trading Signals</span>
-                    <span className="font-bold">$4,365</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Lead Generation Pro</span>
-                    <span className="font-bold">$6,304</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>RHNIS Identity Suite</span>
-                    <span className="font-bold">$8,316</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Full AI Ecosystem</span>
-                    <span className="font-bold">$10,934</span>
-                  </div>
+                  {revenueBreakdown.map((entry) => (
+                    <div key={entry.service} className="flex justify-between items-center">
+                      <span>{entry.service}</span>
+                      <span className="font-bold">${entry.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  {!revenueBreakdown.length && (
+                    <p className="text-sm text-muted-foreground">No revenue breakdown yet.</p>
+                  )}
                   <hr />
                   <div className="flex justify-between items-center font-bold text-lg">
                     <span>Total Monthly Revenue</span>
-                    <span>${totalRevenue.toFixed(2)}</span>
+                    <span>${revenueTotal.toLocaleString()}</span>
                   </div>
                 </div>
               </CardContent>

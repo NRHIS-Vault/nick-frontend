@@ -1,22 +1,66 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Shield, Eye, Fingerprint, Radio, Download, Upload } from 'lucide-react';
+import { getRHNISIdentity, type RHNISIdentityResponse } from '@/lib/api';
 
 const RHNISIdentity: React.FC = () => {
   const [activeTab, setActiveTab] = useState('identity');
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['rhnis-identity'],
+    queryFn: getRHNISIdentity,
+  });
 
-  const identityFeatures = [
-    { icon: Fingerprint, title: 'Voice Signature', status: 'Active', description: 'Unique voice pattern recognition' },
-    { icon: Eye, title: 'Face Recognition', status: 'Active', description: 'Facial identity verification' },
-    { icon: Radio, title: 'Digital Beacon', status: 'Broadcasting', description: 'Traceable digital footprint' },
-    { icon: Shield, title: 'Sting Mode', status: 'Armed', description: 'Scammer detection & trapping' }
-  ];
+  const identityFeatures = data?.identityFeatures ?? [];
+  const beaconData = data?.beaconData ?? [];
+  const legacyStats = data?.legacyStats ?? {
+    voiceRecordingsMb: 0,
+    interactionLogsMb: 0,
+    digitalSignaturesMb: 0,
+  };
+  const beaconSignature = data?.beaconSignature ?? 'RHNIS-PENDING';
 
-  const beaconData = [
-    { type: 'Social Media', count: 1247, status: 'Propagating' },
-    { type: 'Comments', count: 892, status: 'Active' },
-    { type: 'Posts', count: 156, status: 'Spreading' },
-    { type: 'Interactions', count: 3421, status: 'Tracking' }
-  ];
+  const iconMap: Record<string, any> = {
+    fingerprint: Fingerprint,
+    eye: Eye,
+    radio: Radio,
+    shield: Shield,
+  };
+  const formatSize = (mb: number) =>
+    mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
+
+  if (isLoading) {
+    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading RHNIS data...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
+        <p className="text-destructive mb-3">Could not load RHNIS data.</p>
+        <button
+          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+          onClick={() => refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!identityFeatures.length && !beaconData.length) {
+    return (
+      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
+        No identity data available. Refresh to try again.
+        <div className="mt-3">
+          <button
+            className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            onClick={() => refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -51,32 +95,35 @@ const RHNISIdentity: React.FC = () => {
       {/* Identity System Tab */}
       {activeTab === 'identity' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {identityFeatures.map((feature, index) => (
-            <div key={index} className="bg-card rounded-lg p-6 border border-border shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/20 rounded-lg text-primary">
-                    <feature.icon size={20} />
+          {identityFeatures.map((feature, index) => {
+            const Icon = iconMap[feature.icon] ?? Shield;
+            return (
+              <div key={index} className="bg-card rounded-lg p-6 border border-border shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/20 rounded-lg text-primary">
+                      <Icon size={20} />
+                    </div>
+                    <h3 className="text-foreground font-semibold">{feature.title}</h3>
                   </div>
-                  <h3 className="text-foreground font-semibold">{feature.title}</h3>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    feature.status === 'Active' || feature.status === 'Broadcasting' || feature.status === 'Armed'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-100' 
+                      : 'bg-surface-muted text-muted-foreground'
+                  }`}>
+                    {feature.status}
+                  </span>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  feature.status === 'Active' || feature.status === 'Broadcasting' || feature.status === 'Armed'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-100' 
-                    : 'bg-surface-muted text-muted-foreground'
-                }`}>
-                  {feature.status}
-                </span>
+                <p className="text-muted-foreground text-sm">{feature.description}</p>
+                
+                {feature.title === 'Sting Mode' && (
+                  <div className="mt-4 p-3 bg-destructive/10 border border-destructive/40 rounded-lg">
+                    <p className="text-destructive text-sm">⚠️ Active trap systems monitoring for scam attempts</p>
+                  </div>
+                )}
               </div>
-              <p className="text-muted-foreground text-sm">{feature.description}</p>
-              
-              {feature.title === 'Sting Mode' && (
-                <div className="mt-4 p-3 bg-destructive/10 border border-destructive/40 rounded-lg">
-                  <p className="text-destructive text-sm">⚠️ Active trap systems monitoring for scam attempts</p>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -117,9 +164,12 @@ const RHNISIdentity: React.FC = () => {
               <div className="flex-1">
                 <p className="text-muted-foreground text-sm mb-2">Current beacon signature</p>
                 <p className="text-foreground font-mono text-xs bg-surface-muted p-2 rounded border border-border">
-                  RHNIS-{Date.now().toString(36).toUpperCase()}
+                  {beaconSignature}
                 </p>
-                <button className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm">
+                <button
+                  className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+                  onClick={() => refetch()}
+                >
                   Generate New Beacon
                 </button>
               </div>
@@ -137,15 +187,15 @@ const RHNISIdentity: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-surface-muted rounded-lg border border-border">
                   <span className="text-foreground">Voice Recordings</span>
-                  <span className="text-primary">2.3 GB</span>
+                  <span className="text-primary">{formatSize(legacyStats.voiceRecordingsMb)}</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-surface-muted rounded-lg border border-border">
                   <span className="text-foreground">Interaction Logs</span>
-                  <span className="text-primary">456 MB</span>
+                  <span className="text-primary">{formatSize(legacyStats.interactionLogsMb)}</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-surface-muted rounded-lg border border-border">
                   <span className="text-foreground">Digital Signatures</span>
-                  <span className="text-primary">12 MB</span>
+                  <span className="text-primary">{formatSize(legacyStats.digitalSignaturesMb)}</span>
                 </div>
               </div>
               <div className="space-y-4">

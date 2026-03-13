@@ -1,108 +1,66 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import { Progress } from './ui/progress';
 import { Share2, Users, MessageSquare, TrendingUp, Target, Zap, Calendar } from 'lucide-react';
+import { getLeadBotData, type LeadBotResponse } from '@/lib/api';
 
-interface Campaign {
-  id: string;
-  platform: string;
-  content: string;
-  reach: number;
-  leads: number;
-  engagement: number;
-  status: 'ACTIVE' | 'SCHEDULED' | 'COMPLETED';
-  scheduledTime?: Date;
-}
-
-interface Lead {
-  id: string;
-  name: string;
-  phone: string;
-  service: string;
-  source: string;
-  timestamp: Date;
-  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CONVERTED';
-}
+type Campaign = LeadBotResponse['campaigns'][number];
+type Lead = LeadBotResponse['recentLeads'][number];
+type Platform = LeadBotResponse['platforms'][number];
 
 export default function LeadBot() {
   const [isActive, setIsActive] = useState(true);
-  const [totalLeads, setTotalLeads] = useState(847);
-  const [monthlyLeads, setMonthlyLeads] = useState(156);
-  const [conversionRate, setConversionRate] = useState(23.5);
-  
-  const [campaigns, setCampaigns] = useState<Campaign[]>([
-    {
-      id: '1',
-      platform: 'Facebook',
-      content: 'Professional fence installation - Free estimates! Transform your property with quality fencing.',
-      reach: 12500,
-      leads: 28,
-      engagement: 8.5,
-      status: 'ACTIVE'
-    },
-    {
-      id: '2',
-      platform: 'Instagram',
-      content: 'Before & After: Amazing fence transformations in your area. See the difference quality makes!',
-      reach: 8900,
-      leads: 19,
-      engagement: 12.3,
-      status: 'ACTIVE'
-    },
-    {
-      id: '3',
-      platform: 'TikTok',
-      content: 'Quick fence repair tips & when to call the pros. Don\'t let damaged fences hurt your property value!',
-      reach: 15600,
-      leads: 34,
-      engagement: 15.8,
-      status: 'SCHEDULED',
-      scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000)
-    }
-  ]);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['lead-bot'],
+    queryFn: getLeadBotData,
+  });
 
-  const [recentLeads, setRecentLeads] = useState<Lead[]>([
-    { id: '1', name: 'Maria Rodriguez', phone: '(555) 123-4567', service: 'Chain Link Fence', source: 'Facebook', timestamp: new Date(), status: 'NEW' },
-    { id: '2', name: 'John Smith', phone: '(555) 987-6543', service: 'Privacy Fence', source: 'Instagram', timestamp: new Date(Date.now() - 30 * 60 * 1000), status: 'CONTACTED' },
-    { id: '3', name: 'Lisa Johnson', phone: '(555) 456-7890', service: 'Fence Repair', source: 'TikTok', timestamp: new Date(Date.now() - 60 * 60 * 1000), status: 'QUALIFIED' }
-  ]);
+  const overview = data?.overview;
+  const campaigns = data?.campaigns ?? [];
+  const recentLeads = data?.recentLeads ?? [];
+  const platforms = data?.platforms ?? [];
 
-  const [platforms] = useState([
-    { name: 'Facebook', status: 'connected', posts: 45, leads: 128 },
-    { name: 'Instagram', status: 'connected', posts: 38, leads: 94 },
-    { name: 'TikTok', status: 'connected', posts: 22, leads: 67 },
-    { name: 'LinkedIn', status: 'pending', posts: 0, leads: 0 }
-  ]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (isActive) {
-        // Simulate new leads coming in
-        if (Math.random() > 0.8) {
-          setTotalLeads(prev => prev + 1);
-          setMonthlyLeads(prev => prev + 1);
-        }
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [isActive]);
+  const totalLeads = overview?.totalLeads ?? 0;
+  const monthlyLeads = overview?.monthlyLeads ?? 0;
+  const conversionRate = overview?.conversionRate ?? 0;
 
   const handleCreateCampaign = () => {
-    const newCampaign: Campaign = {
-      id: Date.now().toString(),
-      platform: 'Auto-Selected',
-      content: 'AI-Generated: Quality fencing solutions for your home. Professional installation, competitive prices!',
-      reach: 0,
-      leads: 0,
-      engagement: 0,
-      status: 'SCHEDULED',
-      scheduledTime: new Date(Date.now() + 30 * 60 * 1000)
-    };
-    setCampaigns(prev => [newCampaign, ...prev]);
+    // For now, re-fetch sample data to emulate a refresh after creation.
+    refetch();
   };
+
+  if (isLoading) {
+    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading LeadBot data...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
+        <p className="text-destructive mb-3">Could not load LeadBot data.</p>
+        <button
+          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+          onClick={() => refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!campaigns.length && !platforms.length && !recentLeads.length) {
+    return (
+      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
+        No LeadBot data available yet. Try reloading.
+        <div className="mt-3">
+          <Button onClick={() => refetch()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -213,7 +171,7 @@ export default function LeadBot() {
                   {campaign.scheduledTime && (
                     <div className="mt-2 flex items-center space-x-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>Scheduled: {campaign.scheduledTime.toLocaleTimeString()}</span>
+                      <span>Scheduled: {new Date(campaign.scheduledTime).toLocaleTimeString()}</span>
                     </div>
                   )}
                 </div>
@@ -281,7 +239,7 @@ export default function LeadBot() {
                       <Badge variant="outline">{lead.source}</Badge>
                     </td>
                     <td className="p-2 text-sm text-muted-foreground">
-                      {lead.timestamp.toLocaleTimeString()}
+                      {new Date(lead.timestamp).toLocaleTimeString()}
                     </td>
                     <td className="p-2">
                       <Badge variant={
