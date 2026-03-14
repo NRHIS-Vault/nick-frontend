@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Shield, Eye, Fingerprint, Radio, Download, Upload } from 'lucide-react';
 import { getRHNISIdentity, type RHNISIdentityResponse } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 const RHNISIdentity: React.FC = () => {
   const [activeTab, setActiveTab] = useState('identity');
@@ -29,36 +32,33 @@ const RHNISIdentity: React.FC = () => {
     mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
 
   if (isLoading) {
-    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading RHNIS data...</div>;
-  }
-
-  if (isError) {
     return (
-      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
-        <p className="text-destructive mb-3">Could not load RHNIS data.</p>
-        <button
-          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-          onClick={() => refetch()}
-        >
-          Retry
-        </button>
+      <div className="space-y-4">
+        <Skeleton className="h-10" />
+        <Skeleton className="h-64" />
+        <Skeleton className="h-64" />
       </div>
     );
   }
 
+  if (isError) {
+    return <ErrorState message="Could not load RHNIS data." onRetry={() => refetch()} />;
+  }
+
   if (!identityFeatures.length && !beaconData.length) {
     return (
-      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
-        No identity data available. Refresh to try again.
-        <div className="mt-3">
+      <EmptyState
+        title="No identity data yet"
+        description="Connect RHNIS signals or refresh."
+        action={
           <button
             className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             onClick={() => refetch()}
           >
             Retry
           </button>
-        </div>
-      </div>
+        }
+      />
     );
   }
 

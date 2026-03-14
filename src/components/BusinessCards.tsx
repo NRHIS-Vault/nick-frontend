@@ -2,6 +2,9 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, TrendingUp } from 'lucide-react';
 import { getBusinessCards } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 const statusClass = (status: string) => {
   if (status === 'Active') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-100';
@@ -31,25 +34,34 @@ const BusinessCards: React.FC = () => {
   const businesses = data?.businesses ?? [];
 
   if (isLoading) {
-    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading businesses...</div>;
-  }
-
-  if (isError) {
     return (
-      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
-        <p className="text-destructive mb-3">Could not load businesses.</p>
-        <button
-          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-          onClick={() => refetch()}
-        >
-          Retry
-        </button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 3 }).map((_, idx) => (
+          <Skeleton key={idx} className="h-80" />
+        ))}
       </div>
     );
   }
 
+  if (isError) {
+    return <ErrorState message="Could not load businesses." onRetry={() => refetch()} />;
+  }
+
   if (!businesses.length) {
-    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">No businesses to display yet.</div>;
+    return (
+      <EmptyState
+        title="No businesses to display"
+        description="Add a business or connect data to populate this grid."
+        action={
+          <button
+            className="px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            onClick={() => refetch()}
+          >
+            Retry
+          </button>
+        }
+      />
+    );
   }
 
   return (

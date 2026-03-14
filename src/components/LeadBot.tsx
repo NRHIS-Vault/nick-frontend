@@ -7,6 +7,9 @@ import { Switch } from './ui/switch';
 import { Progress } from './ui/progress';
 import { Share2, Users, MessageSquare, TrendingUp, Target, Zap, Calendar } from 'lucide-react';
 import { getLeadBotData, type LeadBotResponse } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 type Campaign = LeadBotResponse['campaigns'][number];
 type Lead = LeadBotResponse['recentLeads'][number];
@@ -34,31 +37,34 @@ export default function LeadBot() {
   };
 
   if (isLoading) {
-    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading LeadBot data...</div>;
-  }
-
-  if (isError) {
     return (
-      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
-        <p className="text-destructive mb-3">Could not load LeadBot data.</p>
-        <button
-          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-          onClick={() => refetch()}
-        >
-          Retry
-        </button>
+      <div className="space-y-4">
+        <Skeleton className="h-10" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
+        </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }
 
+  if (isError) {
+    return <ErrorState message="Could not load LeadBot data." onRetry={() => refetch()} />;
+  }
+
   if (!campaigns.length && !platforms.length && !recentLeads.length) {
     return (
-      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
-        No LeadBot data available yet. Try reloading.
-        <div className="mt-3">
-          <Button onClick={() => refetch()}>Retry</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="No LeadBot data yet"
+        description="Connect social platforms or try again."
+        action={<Button onClick={() => refetch()}>Retry</Button>}
+      />
     );
   }
 

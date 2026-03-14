@@ -2,6 +2,9 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TrendingUp, Users, DollarSign, Activity, ShoppingCart, Home, UtensilsCrossed } from 'lucide-react';
 import { getBusinessStats } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 const BusinessDashboard: React.FC = () => {
   const { data, isLoading, isError, refetch } = useQuery({
@@ -34,32 +37,26 @@ const BusinessDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-card rounded-lg p-6 border border-border shadow-sm text-muted-foreground">
-        Loading business overview...
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-52" />
+          <Skeleton className="h-52" />
+        </div>
       </div>
     );
   }
 
   if (isError) {
-    return (
-      <div className="bg-destructive/10 border border-destructive/40 rounded-lg p-6">
-        <p className="text-destructive mb-3">Could not load business stats.</p>
-        <button
-          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-          onClick={() => refetch()}
-        >
-          Retry
-        </button>
-      </div>
-    );
+    return <ErrorState message="Could not load business stats." onRetry={() => refetch()} />;
   }
 
   if (!stats.length && !recentLeads.length && !ncsStatus.length) {
-    return (
-      <div className="bg-card rounded-lg p-6 border border-border text-muted-foreground">
-        No business data available yet. Try again later.
-      </div>
-    );
+    return <EmptyState title="No business data yet" description="Connect sources to see stats and leads." />;
   }
 
   return (

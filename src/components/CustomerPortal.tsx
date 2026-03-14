@@ -7,6 +7,9 @@ import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Crown, TrendingUp, Users, Zap, DollarSign, Star, CheckCircle } from 'lucide-react';
 import { getCustomerPortalData, type CustomerPortalResponse } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 type Service = CustomerPortalResponse['services'][number];
 type Subscriber = CustomerPortalResponse['subscribers'][number];
@@ -33,26 +36,30 @@ export default function CustomerPortal() {
     : metrics.monthlyRevenue;
 
   if (isLoading) {
-    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading customer portal data...</div>;
-  }
-
-  if (isError) {
     return (
-      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
-        <p className="text-destructive mb-3">Could not load customer portal data.</p>
-        <Button onClick={() => refetch()}>Retry</Button>
+      <div className="space-y-4">
+        <Skeleton className="h-10" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
       </div>
     );
   }
 
+  if (isError) {
+    return <ErrorState message="Could not load customer portal data." onRetry={() => refetch()} />;
+  }
+
   if (!services.length && !subscribers.length) {
     return (
-      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
-        No customer data available yet. Try refreshing.
-        <div className="mt-3">
-          <Button onClick={() => refetch()}>Retry</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="No customer data yet"
+        description="Add services or subscribers, then refresh."
+        action={<Button onClick={() => refetch()}>Retry</Button>}
+      />
     );
   }
 

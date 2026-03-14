@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Phone, Mail, MapPin, Calendar, DollarSign, Filter, Search, Plus } from 'lucide-react';
 import { getLeads, type LeadManagementResponse } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 type Lead = LeadManagementResponse['leads'][number];
 
@@ -36,39 +39,36 @@ const LeadManagement: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
-        Loading leads...
+      <div className="space-y-4">
+        <Skeleton className="h-10" />
+        <Skeleton className="h-12" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-64" />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (isError) {
-    return (
-      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
-        <p className="text-destructive mb-3">Could not load leads.</p>
-        <button
-          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-          onClick={() => refetch()}
-        >
-          Retry
-        </button>
-      </div>
-    );
+    return <ErrorState message="Could not load leads." onRetry={() => refetch()} />;
   }
 
   if (!leads.length) {
     return (
-      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
-        No leads available yet. Click retry to fetch again.
-        <div className="mt-3">
+      <EmptyState
+        title="No leads yet"
+        description="Create a lead or retry after syncing your CRM."
+        action={
           <button
             className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             onClick={() => refetch()}
           >
             Retry
           </button>
-        </div>
-      </div>
+        }
+      />
     );
   }
 
@@ -163,9 +163,10 @@ const LeadManagement: React.FC = () => {
       </div>
 
       {filteredLeads.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No leads found matching your criteria.</p>
-        </div>
+        <EmptyState
+          title="No leads match your filters"
+          description="Try adjusting the search or status filters."
+        />
       )}
     </div>
   );

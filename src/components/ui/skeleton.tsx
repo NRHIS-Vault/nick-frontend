@@ -5,6 +5,8 @@ interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   animated?: boolean
 }
 
+// Generic loading placeholder. Apply height/width via className
+// (e.g., h-6 w-32) and toggle the pulse animation with `animated`.
 function Skeleton({
   className,
   animated = true,
@@ -17,6 +19,7 @@ function Skeleton({
         animated && "animate-pulse",
         className
       )}
+      aria-busy="true"
       {...props}
     />
   )

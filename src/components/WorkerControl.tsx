@@ -2,6 +2,9 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Play, Pause, Square, Settings, Activity, Clock, Cpu, AlertTriangle } from 'lucide-react';
 import { getWorkers, type WorkersResponse } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 type Worker = WorkersResponse['workers'][number];
 
@@ -50,36 +53,41 @@ const WorkerControl: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading workers...</div>;
-  }
-
-  if (isError) {
     return (
-      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
-        <p className="text-destructive mb-3">Could not load worker status.</p>
-        <button
-          className="px-3 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-          onClick={() => refetch()}
-        >
-          Retry
-        </button>
+      <div className="space-y-4">
+        <Skeleton className="h-10" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-20" />
+          ))}
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-28" />
+          ))}
+        </div>
       </div>
     );
   }
 
+  if (isError) {
+    return <ErrorState message="Could not load worker status." onRetry={() => refetch()} />;
+  }
+
   if (!workers.length) {
     return (
-      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
-        No workers reported yet. Refresh to check again.
-        <div className="mt-3">
+      <EmptyState
+        title="No workers reported"
+        description="Connect your automations to see worker status."
+        action={
           <button
             className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             onClick={() => refetch()}
           >
             Retry
           </button>
-        </div>
-      </div>
+        }
+      />
     );
   }
 

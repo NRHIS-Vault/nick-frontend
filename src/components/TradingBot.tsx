@@ -7,6 +7,9 @@ import { Switch } from './ui/switch';
 import { Progress } from './ui/progress';
 import { TrendingUp, TrendingDown, DollarSign, Activity, Zap, Target } from 'lucide-react';
 import { getTradingBotData, type TradingBotResponse } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 type Trade = TradingBotResponse['trades'][number];
 type Signal = TradingBotResponse['signals'][number];
@@ -33,26 +36,34 @@ export default function TradingBot() {
   }, [data?.botStatus]);
 
   if (isLoading) {
-    return <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">Loading TradingBot data...</div>;
-  }
-
-  if (isError) {
     return (
-      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive/40">
-        <p className="text-destructive mb-3">Could not load trading data.</p>
-        <Button onClick={() => refetch()}>Retry</Button>
+      <div className="space-y-4">
+        <Skeleton className="h-10" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
+        </div>
+        <Skeleton className="h-72" />
       </div>
     );
   }
 
+  if (isError) {
+    return <ErrorState message="Could not load trading data." onRetry={() => refetch()} />;
+  }
+
   if (!trades.length && !signals.length && !platforms.length) {
     return (
-      <div className="bg-card p-6 rounded-lg border border-border text-muted-foreground">
-        No trading data available yet. Try refreshing.
-        <div className="mt-3">
-          <Button onClick={() => refetch()}>Retry</Button>
-        </div>
-      </div>
+      <EmptyState
+        title="No trading data yet"
+        description="Connect an exchange or retry."
+        action={<Button onClick={() => refetch()}>Retry</Button>}
+      />
     );
   }
 
