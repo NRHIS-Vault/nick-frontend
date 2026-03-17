@@ -34,8 +34,21 @@ export const getSupabaseClient = (): SupabaseClient => {
   return cachedClient;
 };
 
-// Export a ready-to-use singleton for convenience; modules can also call getSupabaseClient().
-export const supabaseClient = getSupabaseClient();
+/**
+ * Export a lazy singleton proxy so modules can keep importing `supabaseClient`
+ * without forcing client construction at module-evaluation time.
+ *
+ * That matters for routes like `/login`: once the page is imported into the router,
+ * we still want the rest of the app to boot even if Supabase env vars are missing.
+ * The proxy resolves the real client only when code actually touches the export.
+ */
+export const supabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, property) {
+    const client = getSupabaseClient();
+    const value = (client as unknown as Record<PropertyKey, unknown>)[property];
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 
 // Helper: fetch the currently signed-in user (or null if not authenticated).
 export const getCurrentUser = async (): Promise<User | null> => {

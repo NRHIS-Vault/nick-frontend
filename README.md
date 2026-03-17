@@ -6,7 +6,7 @@ Dashboard UI scaffold for the Nick AI platform: chat, lead gen, trading bot, wor
 - Vite + React 18 + TypeScript
 - Tailwind CSS + shadcn/ui component set
 - TanStack Query (data fetching + caching for dashboard panels)
-- Supabase JS client present for future auth/data (not wired yet)
+- Supabase JS client for authentication plus shared profile helpers
 - lucide-react icons
 
 ## Prerequisites
@@ -22,7 +22,8 @@ npm run dev
 Open the URL Vite prints (default http://localhost:5173).
 
 ## Routing
-- `/` and `/dashboard` – `BusinessDashboard` (default view) wrapped in the `ProtectedRoute` stub.
+- `/login` – public authentication page with password sign-in and magic-link email flow.
+- `/` and `/dashboard` – `BusinessDashboard` (default view) protected by the Supabase-aware `ProtectedRoute` when auth env vars are configured.
 - `/trading` – `TradingBot`
 - `/leadbot` – `LeadBot`
 - `/portal` – `CustomerPortal`
@@ -31,7 +32,7 @@ Open the URL Vite prints (default http://localhost:5173).
 - `/leads` – `LeadManagement`
 - `/workers` – `WorkerControl`
 - `/chat` – Nick chat surface (avatar header + `ChatInterface`)
-- `/settings` – placeholder settings panel (ready for future auth/data)
+- `/settings` – placeholder settings panel
 - `*` – `NotFound` accessible 404 with dashboard/chat recovery links.
 
 ## Build & preview
@@ -54,18 +55,30 @@ npm run lint
   - `VITE_API_BASE` – Base URL for your backend/worker API.
 - `vite.config.ts` loads `dotenv` plus `loadEnv`; runtime code reads from `import.meta.env` via `src/lib/config.ts`. Empty strings are allowed when a service is not configured.
 
+## Authentication
+- `src/routes/ProtectedRoute.tsx` is now the route guard for the dashboard shell. When `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present, it calls `supabase.auth.getSession()` on load, subscribes to `onAuthStateChange()`, and redirects unauthenticated visitors to `/login`.
+- Redirects preserve the originally requested route in router state. After a successful login, users are sent back to that route; otherwise the fallback destination is `/dashboard`.
+- `src/pages/Login.tsx` keeps `email` and `password` as controlled inputs, validates them before submit, and surfaces inline field errors plus Supabase auth errors.
+- `Sign In` calls `signInWithPassword({ email, password })` and navigates into the protected app on success.
+- `Send Magic Link` calls `signInWithOtp({ email, options: { emailRedirectTo } })`. The redirect URL is built from the protected route the user originally requested, so the email link returns them to the right page after Supabase processes the token.
+- `src/lib/supabaseClient.ts` now exports a lazy client proxy. Importing auth helpers is safe even when Supabase env vars are absent; the helper still throws at call time if you try to use auth/data features without configuration.
+- If Supabase is not configured locally, the login page shows a warning and disables auth actions, while `ProtectedRoute` stays permissive so the UI scaffold remains explorable during frontend-only work.
+
 ## Project structure
 - `src/App.tsx` – app shell with theme, query client, and nested routes per panel.
 - `src/pages/Index.tsx` – wraps `AppLayout` with `AppProvider` for layout state.
+- `src/pages/Login.tsx` – public authentication page with validated password and magic-link flows.
 - `src/components/AppLayout.tsx` – main dashboard frame, Link-based navigation, and `<Outlet>` for child routes.
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
-- `src/routes/ProtectedRoute.tsx` – stub guard that currently returns children; drop in auth checks later.
+- `src/routes/ProtectedRoute.tsx` – Supabase session guard for protected dashboard routes.
 - `src/pages/NotFound.tsx` – accessible 404 with recovery links back to the dashboard or chat.
 - `src/contexts/ThemeContext.tsx` – light/dark theme state, root class toggling, and localStorage persistence.
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
 - `src/lib/config.ts` – typed access to env vars with safe fallbacks.
 - `src/lib/api.ts` – lightweight fetch helpers for the dashboard mock APIs (business stats, leads, workers, cards, LeadBot, TradingBot, customer portal, RHNIS).
+- `src/lib/apiClient.ts` – generic `apiRequest<T>` wrapper around `fetch` with descriptive errors.
+- `src/lib/types.ts` – shared TypeScript interfaces for all API payloads (stats, leads, workers, trades, customers, identity).
 - `src/lib/supabaseClient.ts` – singleton Supabase client plus auth/profile helpers.
 - UI states: `src/components/ui/skeleton.tsx`, `src/components/ui/empty-state.tsx`, `src/components/ui/error-state.tsx` for consistent loading/empty/error rendering.
 - `src/index.css` – Tailwind tokens/base.
@@ -79,6 +92,7 @@ npm run lint
 - `Skeleton` – animated placeholder; apply height/width via `className`.
 - `EmptyState` – neutral empty-data message with optional icon/action.
 - `ErrorState` – standardized error card with optional retry button.
+- API client – `apiRequest<T>(url, options?)` wraps `fetch`, applies `VITE_API_BASE`, throws descriptive errors, and parses JSON into `T`. Prefer using the specific helpers in `src/lib/api.ts` which already type responses via `src/lib/types.ts`.
 - Example:
 ```tsx
 const { isLoading, isError, data, refetch } = useQuery(...);
@@ -100,7 +114,8 @@ if (!data?.length) return <EmptyState action={<Button onClick={refetch}>Retry</B
 ## Supabase client usage
 - Import the shared client from `src/lib/supabaseClient.ts`: `import { supabaseClient, getCurrentUser, getUserProfile, updateProfile } from "@/lib/supabaseClient";`
 - The client is a singleton so auth state (refresh tokens, realtime sockets) stays consistent across tabs/components instead of being recreated per hook/component.
+- `supabaseClient` is now a lazy proxy, so importing the module will not crash immediately when local auth env vars are missing. `getSupabaseClient()` and any proxied client call still throw once you actually try to use Supabase without configuration.
 - `getCurrentUser()` wraps `supabase.auth.getUser()` for quick session checks.
 - `getUserProfile(userId)` reads from the `profiles` table (adjust the table name/columns to match your schema).
 - `updateProfile(profile)` upserts into `profiles` and returns the saved row; pass at least an `id` along with any columns you want to update.
-- Ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set before importing the client; the helper throws early if they are missing to avoid silently misconfigured auth calls.
+- Ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set before calling auth/data helpers; the helper throws when Supabase features are actually used to avoid silently misconfigured auth calls.

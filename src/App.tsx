@@ -14,6 +14,7 @@ import WorkerControl from "@/components/WorkerControl";
 import ChatInterface from "@/components/ChatInterface";
 import NickAvatar from "@/components/NickAvatar";
 import Index from "./pages/Index";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,12 @@ const App = () => (
     <TooltipProvider>
       <BrowserRouter>
         <Routes>
+          {/* Public auth entry point. The page stays outside the dashboard shell so users
+              can sign in without loading the full application chrome first. */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Protected application shell. Each child route inherits the shared layout and
+              now passes through the session-aware ProtectedRoute wrapper. */}
           <Route path="/" element={<Index />}>
             <Route
               index
