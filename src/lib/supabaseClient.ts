@@ -21,7 +21,8 @@ const createSupabaseClient = () => {
     auth: {
       // Persist the session in localStorage so tabs share the auth state.
       persistSession: true,
-      autoRefreshToken: true,
+      // AuthContext owns explicit pre-expiry refresh calls via refreshSession().
+      autoRefreshToken: false,
       detectSessionInUrl: true,
     },
   });

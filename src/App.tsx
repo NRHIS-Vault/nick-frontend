@@ -2,6 +2,7 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/routes/ProtectedRoute";
 import BusinessDashboard from "@/components/BusinessDashboard";
 import TradingBot from "@/components/TradingBot";
@@ -44,105 +45,38 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Public auth entry point. The page stays outside the dashboard shell so users
-              can sign in without loading the full application chrome first. */}
-          <Route path="/login" element={<Login />} />
+        <AuthProvider>
+          <Routes>
+            {/* Public auth entry point. The page stays outside the dashboard shell so users
+                can sign in without loading the full application chrome first. */}
+            <Route path="/login" element={<Login />} />
 
-          {/* Protected application shell. Each child route inherits the shared layout and
-              now passes through the session-aware ProtectedRoute wrapper. */}
-          <Route path="/" element={<Index />}>
+            {/* Protected application shell. The entire dashboard layout now reads from
+                AuthContext through a single ProtectedRoute wrapper instead of repeating
+                the guard around every child page. */}
             <Route
-              index
+              path="/"
               element={
                 <ProtectedRoute>
-                  <BusinessDashboard />
+                  <Index />
                 </ProtectedRoute>
               }
-            />
-            <Route
-              path="dashboard"
-              element={
-                <ProtectedRoute>
-                  <BusinessDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="trading"
-              element={
-                <ProtectedRoute>
-                  <TradingBot />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="leadbot"
-              element={
-                <ProtectedRoute>
-                  <LeadBot />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="portal"
-              element={
-                <ProtectedRoute>
-                  <CustomerPortal />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="rhnis"
-              element={
-                <ProtectedRoute>
-                  <RHNISIdentity />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="businesses"
-              element={
-                <ProtectedRoute>
-                  <BusinessCards />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="leads"
-              element={
-                <ProtectedRoute>
-                  <LeadManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="workers"
-              element={
-                <ProtectedRoute>
-                  <WorkerControl />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="chat"
-              element={
-                <ProtectedRoute>
-                  <ChatPanel />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <ProtectedRoute>
-                  <SettingsPanel />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
+            >
+              <Route index element={<BusinessDashboard />} />
+              <Route path="dashboard" element={<BusinessDashboard />} />
+              <Route path="trading" element={<TradingBot />} />
+              <Route path="leadbot" element={<LeadBot />} />
+              <Route path="portal" element={<CustomerPortal />} />
+              <Route path="rhnis" element={<RHNISIdentity />} />
+              <Route path="businesses" element={<BusinessCards />} />
+              <Route path="leads" element={<LeadManagement />} />
+              <Route path="workers" element={<WorkerControl />} />
+              <Route path="chat" element={<ChatPanel />} />
+              <Route path="settings" element={<SettingsPanel />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

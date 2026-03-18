@@ -1,13 +1,13 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowRight, KeyRound, LoaderCircle, MailCheck, ShieldCheck } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { KeyRound, LoaderCircle, MailCheck, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { hasSupabaseConfig } from "@/lib/config";
+import { useAuth } from "@/hooks/use-auth";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type FieldErrors = {
@@ -86,73 +86,31 @@ const buildRedirectTo = (path: string) => {
 const LoginContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const supabaseConfigured = hasSupabaseConfig();
+  const { user, session, isLoading, isConfigured } = useAuth();
   const redirectPath = getRedirectPath(location.state as LoginLocationState | null);
   const redirectTo = buildRedirectTo(redirectPath);
+  const isAuthenticated = Boolean(session?.user ?? user);
 
   // Step 1: keep the form fully controlled so validation, loading states, and auth actions
-  // all read from a single source of truth.
+  // all read from a single source of truth while AuthContext owns the actual session lifecycle.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [authError, setAuthError] = useState<string | null>(null);
   const [magicLinkMessage, setMagicLinkMessage] = useState<string | null>(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(supabaseConfigured);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSendingMagicLink, setIsSendingMagicLink] = useState(false);
 
-  // Step 2: if the visitor already has a session, redirect them away from `/login`
-  // immediately. This also handles the moment after Supabase consumes a magic-link URL.
+  // Step 2: once AuthContext confirms that a valid session exists, redirect away from
+  // `/login` and send the user to the protected route they originally requested.
   useEffect(() => {
-    if (!supabaseConfigured) {
-      setIsCheckingSession(false);
-      return;
+    if (!isLoading && isAuthenticated) {
+      navigate(redirectPath, { replace: true });
     }
+  }, [isAuthenticated, isLoading, navigate, redirectPath]);
 
-    const supabase = getSupabaseClient();
-    let isMounted = true;
-
-    const finishSessionCheck = (hasSession: boolean) => {
-      if (!isMounted) return;
-
-      if (hasSession) {
-        navigate(redirectPath, { replace: true });
-        return;
-      }
-
-      setIsCheckingSession(false);
-    };
-
-    const loadSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-
-      if (!isMounted) return;
-
-      if (error) {
-        setAuthError(getErrorMessage(error));
-        setIsCheckingSession(false);
-        return;
-      }
-
-      finishSessionCheck(Boolean(data.session?.user));
-    };
-
-    void loadSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      finishSessionCheck(Boolean(session?.user));
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, [navigate, redirectPath, supabaseConfigured]);
-
-  // Step 3: validate fields on blur so users get quick feedback without waiting
-  // for a full submit cycle.
+  // Step 3: validate individual fields on blur so users get immediate feedback
+  // without waiting for a full submit attempt.
   const validateField = (field: keyof FieldErrors, value: string) => {
     const nextError = field === "email" ? validateEmail(value) : validatePassword(value);
     setFieldErrors((current) => ({
@@ -161,7 +119,7 @@ const LoginContent = () => {
     }));
   };
 
-  // Step 4: validate the exact fields needed for each action before making any network call.
+  // Step 4: password sign-in needs both fields, while magic-link auth only needs email.
   const validateForSignIn = () => {
     const nextErrors = {
       email: validateEmail(email),
@@ -183,8 +141,8 @@ const LoginContent = () => {
     return !nextEmailError;
   };
 
-  // Step 5: password sign-in uses the shared Supabase client and redirects
-  // to the originally requested protected route on success.
+  // Step 5: submit password credentials through Supabase. AuthContext will receive the
+  // resulting session via `onAuthStateChange`, update shared state, and trigger the redirect effect above.
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAuthError(null);
@@ -194,7 +152,7 @@ const LoginContent = () => {
       return;
     }
 
-    if (!supabaseConfigured) {
+    if (!isConfigured) {
       setAuthError(
         "Supabase auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY first."
       );
@@ -213,8 +171,6 @@ const LoginContent = () => {
         setAuthError(formatAuthError(error.message));
         return;
       }
-
-      navigate(redirectPath, { replace: true });
     } catch (error) {
       setAuthError(getErrorMessage(error));
     } finally {
@@ -222,8 +178,8 @@ const LoginContent = () => {
     }
   };
 
-  // Step 6: magic-link sign-in validates only the email field and sends the visitor
-  // back to the same route after Supabase verifies the email link.
+  // Step 6: request a passwordless email link that brings the user back to the same protected route
+  // after Supabase processes the callback URL.
   const handleSendMagicLink = async () => {
     setAuthError(null);
     setMagicLinkMessage(null);
@@ -232,7 +188,7 @@ const LoginContent = () => {
       return;
     }
 
-    if (!supabaseConfigured) {
+    if (!isConfigured) {
       setAuthError(
         "Supabase auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY first."
       );
@@ -264,9 +220,9 @@ const LoginContent = () => {
     }
   };
 
-  // Step 7: preserve the auth screen while the current session is being restored
-  // so users do not see a flash of the form before being redirected.
-  if (isCheckingSession) {
+  // Step 7: while AuthContext is hydrating the initial session, keep a stable loading state
+  // on screen so users do not see the login form flash before being redirected.
+  if (isLoading) {
     return (
       <main className="min-h-screen bg-background px-6 py-12 text-foreground">
         <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-2xl items-center justify-center">
@@ -278,7 +234,31 @@ const LoginContent = () => {
               <div className="space-y-2">
                 <CardTitle>Restoring your session</CardTitle>
                 <CardDescription>
-                  Supabase is checking whether you already have a valid sign-in session.
+                  AuthContext is resolving the current Supabase session before routing continues.
+                </CardDescription>
+              </div>
+            </CardHeader>
+          </Card>
+        </div>
+      </main>
+    );
+  }
+
+  // Step 8: if AuthContext already has a user, hold a lightweight redirect state
+  // instead of flashing the full login form for a frame before navigation completes.
+  if (isAuthenticated) {
+    return (
+      <main className="min-h-screen bg-background px-6 py-12 text-foreground">
+        <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-2xl items-center justify-center">
+          <Card className="w-full max-w-lg border-border/60 bg-card/95 shadow-xl">
+            <CardHeader className="space-y-4 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <LoaderCircle className="h-7 w-7 animate-spin" />
+              </div>
+              <div className="space-y-2">
+                <CardTitle>Redirecting to your dashboard</CardTitle>
+                <CardDescription>
+                  Your session is already active, so protected routes are being restored now.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -310,8 +290,8 @@ const LoginContent = () => {
                   Sign in to reach the RHNIS Control Center.
                 </h1>
                 <p className="max-w-2xl text-lg text-muted-foreground">
-                  Use your password for a direct login, or request a magic link that brings you
-                  back to the route you originally tried to open.
+                  AuthContext now owns the current user and session, so one successful login unlocks
+                  every protected dashboard route.
                 </p>
               </div>
 
@@ -330,16 +310,16 @@ const LoginContent = () => {
 
                 <div className="rounded-3xl border border-border/60 bg-card/80 p-5 shadow-sm backdrop-blur">
                   <KeyRound className="h-6 w-6 text-primary" />
-                  <h2 className="mt-4 text-lg font-semibold">Password sign-in</h2>
+                  <h2 className="mt-4 text-lg font-semibold">Shared auth state</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Direct sign-in uses Supabase sessions, so protected dashboard routes unlock
-                    immediately after authentication succeeds.
+                    Protected routes now read the current user from AuthContext instead of each page
+                    asking Supabase for its own session copy.
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                {supabaseConfigured ? (
+                {isConfigured ? (
                   <>
                     <span>After authentication you&apos;ll be returned to</span>
                     <span className="rounded-full border border-border/60 bg-card px-3 py-1 font-mono text-foreground">
@@ -349,13 +329,9 @@ const LoginContent = () => {
                 ) : (
                   <>
                     <span>Auth is disabled in this environment.</span>
-                    <Link
-                      to="/dashboard"
-                      className="inline-flex items-center gap-2 font-medium text-primary hover:text-primary/80"
-                    >
-                      Open the dashboard scaffold
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
+                    <span className="rounded-full border border-border/60 bg-card px-3 py-1 font-mono text-foreground">
+                      Configure Supabase env vars to continue
+                    </span>
                   </>
                 )}
               </div>
@@ -372,7 +348,7 @@ const LoginContent = () => {
               </CardHeader>
 
               <CardContent className="space-y-5">
-                {!supabaseConfigured && (
+                {!isConfigured && (
                   <Alert variant="warning">
                     <AlertTitle>Supabase env vars are missing</AlertTitle>
                     <AlertDescription>
@@ -458,7 +434,7 @@ const LoginContent = () => {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={!supabaseConfigured || isSigningIn || isSendingMagicLink}
+                      disabled={!isConfigured || isSigningIn || isSendingMagicLink}
                     >
                       {isSigningIn ? (
                         <>
@@ -475,7 +451,7 @@ const LoginContent = () => {
                       variant="outline"
                       className="w-full"
                       onClick={handleSendMagicLink}
-                      disabled={!supabaseConfigured || isSigningIn || isSendingMagicLink}
+                      disabled={!isConfigured || isSigningIn || isSendingMagicLink}
                     >
                       {isSendingMagicLink ? (
                         <>
@@ -492,7 +468,8 @@ const LoginContent = () => {
                 <p className="text-sm leading-6 text-muted-foreground">
                   Password sign-in calls <code>signInWithPassword</code>. Magic-link sign-in calls
                   <code>signInWithOtp</code> with your email and a redirect back to
-                  <code className="ml-1">{redirectPath}</code>.
+                  <code className="ml-1">{redirectPath}</code>. AuthContext then stores the shared
+                  user/session state for the rest of the app.
                 </p>
               </CardContent>
             </Card>

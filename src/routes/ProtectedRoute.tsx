@@ -1,9 +1,7 @@
-// Session-aware route guard for dashboard pages that should require authentication
-// whenever Supabase auth is configured for the environment.
-import { ReactNode, useEffect, useState } from "react";
+// Route guard that consumes the shared auth context instead of reading Supabase directly.
+import { type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { hasSupabaseConfig } from "@/lib/config";
-import { getSupabaseClient } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/use-auth";
 
 type ProtectedRouteProps = {
   children: ReactNode;
@@ -11,55 +9,10 @@ type ProtectedRouteProps = {
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const location = useLocation();
-  const [isLoading, setIsLoading] = useState(hasSupabaseConfig());
-  const [isAuthenticated, setIsAuthenticated] = useState(!hasSupabaseConfig());
+  const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    // Keep the existing scaffold usable when Supabase isn't configured locally.
-    if (!hasSupabaseConfig()) {
-      setIsAuthenticated(true);
-      setIsLoading(false);
-      return;
-    }
-
-    const supabase = getSupabaseClient();
-    let isMounted = true;
-
-    // Step 1: read the current session so refreshes and deep links can restore access.
-    const loadSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-
-      if (!isMounted) return;
-
-      if (error) {
-        console.error("Failed to read the current Supabase session.", error);
-        setIsAuthenticated(false);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsAuthenticated(Boolean(data.session?.user));
-      setIsLoading(false);
-    };
-
-    void loadSession();
-
-    // Step 2: subscribe so sign-in, sign-out, and magic-link callbacks update the guard live.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
-      setIsAuthenticated(Boolean(session?.user));
-      setIsLoading(false);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Step 3: keep a neutral loading state on screen until we know whether the user has a session.
+  // Step 1: while AuthProvider is still hydrating the current session, keep protected
+  // content on hold so the UI does not flash before the auth state settles.
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center px-6 py-16">
@@ -78,12 +31,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  // Step 4: unauthenticated visitors get redirected to `/login`, along with the route they asked for.
-  if (!isAuthenticated) {
+  // Step 2: once the context is ready, authenticated users can proceed and everyone
+  // else gets sent to the public login page with their intended destination preserved.
+  if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Step 5: authenticated users can render the protected page normally.
+  // Step 3: render the protected route only when a user exists in AuthContext.
   return <>{children}</>;
 };
 
