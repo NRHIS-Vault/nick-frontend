@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { KeyRound, LoaderCircle, MailCheck, ShieldCheck } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { KeyRound, LoaderCircle, MailCheck, ShieldCheck, Wrench } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,7 +86,15 @@ const buildRedirectTo = (path: string) => {
 const LoginContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, session, isLoading, isConfigured } = useAuth();
+  const {
+    user,
+    session,
+    isLoading,
+    isConfigured,
+    isLocalDevAuthEnabled,
+    localDevCredentials,
+    signInWithLocalDevAccount,
+  } = useAuth();
   const redirectPath = getRedirectPath(location.state as LoginLocationState | null);
   const redirectTo = buildRedirectTo(redirectPath);
   const isAuthenticated = Boolean(session?.user ?? user);
@@ -152,16 +160,27 @@ const LoginContent = () => {
       return;
     }
 
-    if (!isConfigured) {
-      setAuthError(
-        "Supabase auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY first."
-      );
-      return;
-    }
-
     setIsSigningIn(true);
 
     try {
+      // Step 5a: in local Vite dev mode, accept the local fallback credentials before
+      // touching Supabase so the auth UI can be exercised without a seeded remote user.
+      const localDevResult = await signInWithLocalDevAccount(normalizeEmail(email), password);
+
+      if (localDevResult.matched) {
+        if (localDevResult.error) {
+          setAuthError(localDevResult.error);
+        }
+        return;
+      }
+
+      if (!isConfigured) {
+        setAuthError(
+          "Supabase auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY first."
+        );
+        return;
+      }
+
       const { error } = await getSupabaseClient().auth.signInWithPassword({
         email: normalizeEmail(email),
         password,
@@ -318,6 +337,27 @@ const LoginContent = () => {
                 </div>
               </div>
 
+              {isLocalDevAuthEnabled && localDevCredentials && (
+                <div className="rounded-3xl border border-primary/30 bg-primary/5 p-5 shadow-sm backdrop-blur">
+                  <div className="flex items-center gap-3 text-primary">
+                    <Wrench className="h-5 w-5" />
+                    <h2 className="text-lg font-semibold">Local dev-only credentials</h2>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                    While running <code>npm run dev</code>, you can sign in without Supabase by
+                    using this local fallback account.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                    <span className="rounded-full border border-border/60 bg-card px-3 py-1 font-mono text-foreground">
+                      {localDevCredentials.email}
+                    </span>
+                    <span className="rounded-full border border-border/60 bg-card px-3 py-1 font-mono text-foreground">
+                      {localDevCredentials.password}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 {isConfigured ? (
                   <>
@@ -434,7 +474,7 @@ const LoginContent = () => {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={!isConfigured || isSigningIn || isSendingMagicLink}
+                      disabled={(!isConfigured && !isLocalDevAuthEnabled) || isSigningIn || isSendingMagicLink}
                     >
                       {isSigningIn ? (
                         <>
@@ -468,9 +508,28 @@ const LoginContent = () => {
                 <p className="text-sm leading-6 text-muted-foreground">
                   Password sign-in calls <code>signInWithPassword</code>. Magic-link sign-in calls
                   <code>signInWithOtp</code> with your email and a redirect back to
-                  <code className="ml-1">{redirectPath}</code>. AuthContext then stores the shared
-                  user/session state for the rest of the app.
+                  <code className="ml-1">{redirectPath}</code>. In local Vite development, the page
+                  also accepts the dev-only fallback credentials shown above. AuthContext then stores
+                  the shared user/session state for the rest of the app.
                 </p>
+
+                <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground">
+                  <p>
+                    New here?{" "}
+                    <Link to="/signup" className="font-medium text-primary hover:text-primary/80">
+                      Create an account
+                    </Link>
+                  </p>
+                  <p className="mt-2">
+                    Forgot your password?{" "}
+                    <Link
+                      to="/reset-password"
+                      className="font-medium text-primary hover:text-primary/80"
+                    >
+                      Send a reset email
+                    </Link>
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>

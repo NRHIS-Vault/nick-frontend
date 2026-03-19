@@ -23,6 +23,8 @@ Open the URL Vite prints (default http://localhost:5173).
 
 ## Routing
 - `/login` – public authentication page with password sign-in and magic-link email flow.
+- `/signup` – public account-creation page that registers a Supabase user and prompts for email confirmation.
+- `/reset-password` – public password-recovery page that sends a Supabase reset email.
 - `/` and `/dashboard` – `BusinessDashboard` (default view) inside the protected dashboard shell.
 - `/trading` – `TradingBot`
 - `/leadbot` – `LeadBot`
@@ -53,6 +55,9 @@ npm run lint
   - `VITE_SUPABASE_ANON_KEY` – Supabase anon/public key for the client SDK.
   - `VITE_STRIPE_PK` – Stripe publishable key for checkout/payment flows.
   - `VITE_API_BASE` – Base URL for your backend/worker API.
+- Optional local dev auth overrides:
+  - `VITE_DEV_AUTH_EMAIL` – overrides the local Vite dev fallback email (default `dev@nick.local`).
+  - `VITE_DEV_AUTH_PASSWORD` – overrides the local Vite dev fallback password (default `nick-dev-password`).
 - `vite.config.ts` loads `dotenv` plus `loadEnv`; runtime code reads from `import.meta.env` via `src/lib/config.ts`. Empty strings are allowed when a service is not configured.
 
 ## Authentication
@@ -61,15 +66,22 @@ npm run lint
 - `src/routes/ProtectedRoute.tsx` no longer talks to Supabase directly. It consumes `useAuth()`, renders its `children` when a user exists, shows a loading screen while auth is hydrating, and redirects unauthenticated visitors to `/login`.
 - Routing now wraps the entire dashboard shell in a single `ProtectedRoute`, so child routes inherit auth protection without repeating the guard around every page.
 - Redirects preserve the originally requested route in router state. After a successful login, users are sent back to that route; otherwise the fallback destination is `/dashboard`.
-- `src/pages/Login.tsx` keeps `email` and `password` as controlled inputs, validates them before submit, and surfaces inline field errors plus Supabase auth errors.
+- `src/pages/Login.tsx` keeps `email` and `password` as controlled inputs, validates them before submit, surfaces inline field errors plus Supabase auth errors, and links directly to account creation plus password reset.
+- During local Vite development only, `/login` also exposes a built-in fallback account for UI testing: `dev@nick.local` / `nick-dev-password` unless you override those values with `VITE_DEV_AUTH_EMAIL` and `VITE_DEV_AUTH_PASSWORD`.
+- `src/pages/SignUp.tsx` collects `email` and `password`, calls `supabase.auth.signUp({ email, password })`, surfaces weak-password or duplicate-account errors, and tells the user to check their inbox for email confirmation after a successful registration.
+- `src/pages/ResetPassword.tsx` collects an email address, calls `supabase.auth.resetPasswordForEmail(email)`, and shows success/failure messaging for password-recovery requests.
 - `Sign In` calls `signInWithPassword({ email, password })`. `Send Magic Link` calls `signInWithOtp({ email, options: { emailRedirectTo } })`. AuthContext receives the resulting session update and unlocks protected routes centrally.
+- Account creation flow: open `/signup`, submit email plus password, then confirm the account through the email Supabase sends before returning to `/login`.
+- Password reset flow: open `/reset-password`, submit the account email, and follow the recovery instructions delivered by Supabase.
 - `src/lib/supabaseClient.ts` now exports a lazy client proxy and leaves token refresh ownership to `AuthProvider`, so auth imports stay safe while refresh timing lives in one place.
-- If Supabase is not configured locally, the login page shows a warning and disables auth actions. Protected routes will continue redirecting to `/login` until valid auth configuration and a user session exist.
+- If Supabase is not configured locally, passwordless flows remain disabled, but local Vite development can still use the dev-only fallback account on `/login`. Outside local dev mode, protected routes continue redirecting to `/login` until valid auth configuration and a user session exist.
 
 ## Project structure
 - `src/App.tsx` – app shell with theme, query client, and nested routes per panel.
 - `src/pages/Index.tsx` – wraps `AppLayout` with `AppProvider` for layout state.
 - `src/pages/Login.tsx` – public authentication page with validated password and magic-link flows.
+- `src/pages/SignUp.tsx` – public account-creation page with controlled inputs, Supabase `signUp`, and confirmation messaging.
+- `src/pages/ResetPassword.tsx` – public password-reset request page with Supabase email recovery.
 - `src/components/AppLayout.tsx` – main dashboard frame, Link-based navigation, and `<Outlet>` for child routes.
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
 - `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, listens for Supabase auth changes, and refreshes tokens before expiry.

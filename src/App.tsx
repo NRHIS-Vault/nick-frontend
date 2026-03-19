@@ -16,6 +16,8 @@ import ChatInterface from "@/components/ChatInterface";
 import NickAvatar from "@/components/NickAvatar";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import SignUp from "./pages/SignUp";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +52,8 @@ const App = () => (
             {/* Public auth entry point. The page stays outside the dashboard shell so users
                 can sign in without loading the full application chrome first. */}
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Protected application shell. The entire dashboard layout now reads from
                 AuthContext through a single ProtectedRoute wrapper instead of repeating
