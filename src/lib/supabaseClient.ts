@@ -60,12 +60,16 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
 export type Profile = {
   id: string;
+  role?: string | null;
+  subscription_status?: string | null;
   full_name?: string;
   avatar_url?: string;
   [key: string]: unknown;
 };
 
 // Helper: fetch a profile row by user id from the "profiles" table.
+// The frontend expects this row to carry authorization and billing metadata such as
+// `role` and `subscription_status` in addition to optional display fields.
 export const getUserProfile = async (userId: string): Promise<Profile | null> => {
   const { data, error } = await getSupabaseClient()
     .from("profiles")

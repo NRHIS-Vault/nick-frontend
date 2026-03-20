@@ -1,7 +1,9 @@
 // Route guard that consumes the shared auth context instead of reading Supabase directly.
 import { type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import Paywall from "@/components/Paywall";
 import { useAuth } from "@/hooks/use-auth";
+import { useSubscription } from "@/hooks/use-subscription";
 
 type ProtectedRouteProps = {
   children: ReactNode;
@@ -10,6 +12,7 @@ type ProtectedRouteProps = {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const location = useLocation();
   const { user, isLoading } = useAuth();
+  const isSubscribed = useSubscription();
 
   // Step 1: while AuthProvider is still hydrating the current session, keep protected
   // content on hold so the UI does not flash before the auth state settles.
@@ -21,10 +24,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
             Authenticating
           </p>
           <h2 className="mt-3 text-2xl font-semibold text-foreground">
-            Checking your session
+            Checking your access
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Protected routes wait here briefly while Supabase restores the current session.
+            Protected routes wait here briefly while AuthContext restores the current session and
+            loads role/subscription details from Supabase.
           </p>
         </div>
       </div>
@@ -37,7 +41,15 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Step 3: render the protected route only when a user exists in AuthContext.
+  // Step 3: users with a valid session still need an active subscription before the
+  // dashboard unlocks. Roles are fetched alongside subscription state in AuthProvider,
+  // but access remains paywall-driven until role-specific authorization is added later.
+  if (!isSubscribed) {
+    return <Paywall />;
+  }
+
+  // Step 4: render the protected route only when a user exists and their subscription
+  // status has resolved to `active` inside AuthContext.
   return <>{children}</>;
 };
 

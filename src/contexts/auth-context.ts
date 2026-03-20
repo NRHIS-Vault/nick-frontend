@@ -6,9 +6,20 @@ export type LocalDevCredentials = {
   password: string;
 };
 
+export type AuthProfile = {
+  id: string;
+  role: string | null;
+  subscriptionStatus: string | null;
+  fullName: string | null;
+  avatarUrl: string | null;
+};
+
 export type AuthContextValue = {
   user: User | null;
   session: Session | null;
+  profile: AuthProfile | null;
+  role: string | null;
+  subscriptionStatus: string | null;
   isLoading: boolean;
   isConfigured: boolean;
   isLocalDevAuthEnabled: boolean;

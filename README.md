@@ -62,9 +62,12 @@ npm run lint
 
 ## Authentication
 - `src/contexts/AuthContext.tsx` is the source of truth for auth state. `AuthProvider` reads the initial Supabase session, subscribes to `onAuthStateChange()`, stores both `session` and `user` in React state, and exposes them through `useAuth()`.
+- `AuthProvider` also loads the signed-in user’s authorization profile after login/session restore. The app expects a `public.profiles` row keyed by `auth.users.id` with `role` and `subscription_status` columns plus optional `full_name` / `avatar_url` display fields.
 - `AuthProvider` also schedules `supabase.auth.refreshSession()` one minute before `session.expires_at`, so active users refresh tokens before the current session expires.
 - `AuthProvider` now exposes a shared `signOut()` action. It attempts `supabase.auth.signOut()`, clears the in-memory auth state, removes the local dev fallback session from `localStorage`, and leaves the router in a logged-out state that sends the user back to `/login`.
 - `src/routes/ProtectedRoute.tsx` no longer talks to Supabase directly. It consumes `useAuth()`, renders its `children` when a user exists, shows a loading screen while auth is hydrating, and redirects unauthenticated visitors to `/login`.
+- `src/hooks/use-subscription.ts` returns `true` only when `subscription_status === "active"`. `src/routes/ProtectedRoute.tsx` uses that hook to gate the dashboard: signed-out users go to `/login`, signed-in but inactive users see the paywall, and only active subscribers reach the protected routes.
+- `src/components/Paywall.tsx` is the Week 4 placeholder screen shown to authenticated but inactive users. It explains the current subscription state and exposes a disabled subscribe button until billing is wired in.
 - Routing now wraps the entire dashboard shell in a single `ProtectedRoute`, so child routes inherit auth protection without repeating the guard around every page.
 - Redirects preserve the originally requested route in router state. After a successful login, users are sent back to that route; otherwise the fallback destination is `/dashboard`.
 - `src/pages/Login.tsx` keeps `email` and `password` as controlled inputs, validates them before submit, surfaces inline field errors plus Supabase auth errors, and links directly to account creation plus password reset.
@@ -79,6 +82,18 @@ npm run lint
 - `src/lib/supabaseClient.ts` now exports a lazy client proxy and leaves token refresh ownership to `AuthProvider`, so auth imports stay safe while refresh timing lives in one place.
 - If Supabase is not configured locally, passwordless flows remain disabled, but local Vite development can still use the dev-only fallback account on `/login`. Outside local dev mode, protected routes continue redirecting to `/login` until valid auth configuration and a user session exist.
 
+## Supabase Profile Schema
+- This frontend now uses a dedicated `public.profiles` table instead of writing billing/role fields directly onto `auth.users`.
+- Apply `supabase/migrations/20260320_create_profiles.sql` to create the table, RLS policies, timestamps, and an `auth.users` trigger that seeds a default profile row for each new account.
+- Required authorization fields:
+  - `role text not null default 'member'`
+  - `subscription_status text not null default 'inactive'`
+- Optional display fields:
+  - `full_name text`
+  - `avatar_url text`
+- Current access rule: only `subscription_status = 'active'` unlocks the protected dashboard. Any other value (`inactive`, `trialing`, `past_due`, `canceled`, or `null`) renders the paywall instead.
+- `role` is fetched into `AuthContext` alongside subscription data so future route-level authorization can branch on the same profile row without changing the login flow again.
+
 ## Project structure
 - `src/App.tsx` – app shell with theme, query client, and nested routes per panel.
 - `src/pages/Index.tsx` – wraps `AppLayout` with `AppProvider` for layout state.
@@ -86,10 +101,13 @@ npm run lint
 - `src/pages/SignUp.tsx` – public account-creation page with controlled inputs, Supabase `signUp`, and confirmation messaging.
 - `src/pages/ResetPassword.tsx` – public password-reset request page with Supabase email recovery.
 - `src/components/AppLayout.tsx` – main dashboard frame, session-aware navigation, desktop account dropdown, mobile drawer, and `<Outlet>` for child routes.
+- `src/components/Paywall.tsx` – placeholder subscription gate for logged-in users whose `subscription_status` is not active.
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
-- `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, listens for Supabase auth changes, refreshes tokens before expiry, and centralizes sign-out cleanup.
+- `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, loads role/subscription profile fields, refreshes tokens before expiry, and centralizes sign-out cleanup.
 - `src/hooks/use-auth.ts` – small hook wrapper around `AuthContext` so routes/pages can consume auth state without importing the context object directly.
+- `src/hooks/use-subscription.ts` – tiny hook that converts `subscription_status` into a single boolean for paywall gating.
 - `src/routes/ProtectedRoute.tsx` – context-driven guard for protected dashboard routes.
+- `supabase/migrations/20260320_create_profiles.sql` – SQL contract for the `profiles` table, trigger, and RLS policies used by the frontend auth flow.
 - `src/pages/NotFound.tsx` – accessible 404 with recovery links back to the dashboard or chat.
 - `src/contexts/ThemeContext.tsx` – light/dark theme state, root class toggling, and localStorage persistence.
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.

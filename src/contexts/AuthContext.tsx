@@ -1,8 +1,9 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Session, type User } from "@supabase/supabase-js";
 import { config, hasLocalDevAuth, hasSupabaseConfig } from "@/lib/config";
-import { getSupabaseClient } from "@/lib/supabaseClient";
+import { getSupabaseClient, getUserProfile, type Profile as SupabaseProfile } from "@/lib/supabaseClient";
 import { AuthContext } from "./auth-context";
+import { type AuthProfile } from "./auth-context";
 
 const REFRESH_BUFFER_MS = 60 * 1000;
 const LOCAL_DEV_AUTH_STORAGE_KEY = "nick.local-dev-auth";
@@ -11,6 +12,12 @@ type LocalDevAuthStorage = {
   email: string;
   createdAt: string;
 };
+
+const readString = (value: unknown) =>
+  typeof value === "string" && value.trim().length > 0 ? value : null;
+
+const toMetadataRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
 const createLocalDevUser = (email: string): User => {
   const timestamp = new Date().toISOString();
@@ -41,6 +48,38 @@ const createLocalDevSession = (email: string): Session => ({
   token_type: "bearer",
   user: createLocalDevUser(email),
 });
+
+const createLocalDevProfile = (email: string): AuthProfile => ({
+  id: "local-dev-user",
+  role: "admin",
+  subscriptionStatus: "active",
+  fullName: email,
+  avatarUrl: null,
+});
+
+const createAuthProfile = (user: User, profile: SupabaseProfile | null): AuthProfile => {
+  const userMetadata = toMetadataRecord(user.user_metadata);
+  const appMetadata = toMetadataRecord(user.app_metadata);
+
+  // Step 0: prefer the dedicated `profiles` row for billing/authorization state, but
+  // keep lightweight metadata fallbacks so existing Supabase seeds do not hard-break.
+  return {
+    id: user.id,
+    role: readString(profile?.role) ?? readString(appMetadata.role) ?? readString(userMetadata.role),
+    subscriptionStatus:
+      readString(profile?.subscription_status) ??
+      readString(appMetadata.subscription_status) ??
+      readString(userMetadata.subscription_status),
+    fullName:
+      readString(profile?.full_name) ??
+      readString(userMetadata.full_name) ??
+      readString(userMetadata.name),
+    avatarUrl:
+      readString(profile?.avatar_url) ??
+      readString(userMetadata.avatar_url) ??
+      readString(userMetadata.picture),
+  };
+};
 
 const readLocalDevAuth = (expectedEmail: string): LocalDevAuthStorage | null => {
   if (typeof window === "undefined") {
@@ -106,8 +145,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // the same user/session values instead of each route bootstrapping Supabase independently.
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(isConfigured || isLocalDevAuthEnabled);
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(isConfigured || isLocalDevAuthEnabled);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLoading = isAuthLoading || isProfileLoading;
+  const role = profile?.role ?? null;
+  const subscriptionStatus = profile?.subscriptionStatus ?? null;
 
   const clearAuthState = () => {
     if (refreshTimerRef.current !== null) {
@@ -118,7 +162,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     clearLocalDevAuth();
     setSession(null);
     setUser(null);
-    setIsLoading(false);
+    setProfile(null);
+    setIsAuthLoading(false);
+    setIsProfileLoading(false);
   };
 
   // Step 2: expose a local dev-only credential check so the login page can unlock
@@ -146,7 +192,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     writeLocalDevAuth(localDevEmail);
     setSession(nextSession);
     setUser(nextSession.user);
-    setIsLoading(false);
+    setProfile(createLocalDevProfile(localDevEmail));
+    setIsProfileLoading(false);
+    setIsAuthLoading(false);
 
     return { matched: true, error: null };
   };
@@ -189,7 +237,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const nextSession = createLocalDevSession(localDevSession.email);
         setSession(nextSession);
         setUser(nextSession.user);
-        setIsLoading(false);
+        setProfile(createLocalDevProfile(localDevSession.email));
+        setIsProfileLoading(false);
+        setIsAuthLoading(false);
         return;
       }
     }
@@ -200,7 +250,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearLocalDevAuth();
       setSession(null);
       setUser(null);
-      setIsLoading(false);
+      setProfile(null);
+      setIsProfileLoading(false);
+      setIsAuthLoading(false);
       return;
     }
 
@@ -222,7 +274,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearLocalDevAuth();
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
-      setIsLoading(false);
+      setProfile((currentProfile) => {
+        if (!nextSession?.user) {
+          return null;
+        }
+
+        return currentProfile?.id === nextSession.user.id ? currentProfile : null;
+      });
+      setIsProfileLoading(Boolean(nextSession?.user));
+      setIsAuthLoading(false);
     };
 
     const refreshCurrentSession = async () => {
@@ -297,11 +357,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [isConfigured, isLocalDevAuthEnabled, localDevEmail]);
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    const syncAuthorizationProfile = async () => {
+      if (!user) {
+        setProfile(null);
+        setIsProfileLoading(false);
+        return;
+      }
+
+      // Step 10: local dev auth skips the remote profile lookup and stays subscribed by
+      // default so frontend work is not blocked by Stripe/Supabase billing setup.
+      if (user.id === "local-dev-user") {
+        setProfile(createLocalDevProfile(user.email ?? localDevEmail));
+        setIsProfileLoading(false);
+        return;
+      }
+
+      if (!isConfigured) {
+        setProfile(createAuthProfile(user, null));
+        setIsProfileLoading(false);
+        return;
+      }
+
+      try {
+        // Step 11: after every successful login/session restore, read role and
+        // subscription state from `public.profiles` so routing decisions stay centralized.
+        const nextProfile = await getUserProfile(user.id);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setProfile(createAuthProfile(user, nextProfile));
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        console.error("Failed to load the user's authorization profile.", error);
+        setProfile(createAuthProfile(user, null));
+      } finally {
+        if (!isCancelled) {
+          setIsProfileLoading(false);
+        }
+      }
+    };
+
+    void syncAuthorizationProfile();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isConfigured, localDevEmail, session?.access_token, user]);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         session,
+        profile,
+        role,
+        subscriptionStatus,
         isLoading,
         isConfigured,
         isLocalDevAuthEnabled,
