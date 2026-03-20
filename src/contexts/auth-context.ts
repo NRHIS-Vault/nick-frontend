@@ -13,6 +13,7 @@ export type AuthContextValue = {
   isConfigured: boolean;
   isLocalDevAuthEnabled: boolean;
   localDevCredentials: LocalDevCredentials | null;
+  signOut: () => Promise<void>;
   signInWithLocalDevAccount: (
     email: string,
     password: string

@@ -3,11 +3,15 @@ import React, { createContext, useContext, useState } from 'react';
 
 interface AppContextType {
   sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  closeSidebar: () => void;
   toggleSidebar: () => void;
 }
 
 const defaultAppContext: AppContextType = {
   sidebarOpen: false,
+  setSidebarOpen: () => {},
+  closeSidebar: () => {},
   toggleSidebar: () => {},
 };
 
@@ -22,10 +26,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSidebarOpen(prev => !prev);
   };
 
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
+
   return (
     <AppContext.Provider
       value={{
         sidebarOpen,
+        setSidebarOpen,
+        closeSidebar,
         toggleSidebar,
       }}
     >

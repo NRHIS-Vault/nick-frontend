@@ -63,14 +63,17 @@ npm run lint
 ## Authentication
 - `src/contexts/AuthContext.tsx` is the source of truth for auth state. `AuthProvider` reads the initial Supabase session, subscribes to `onAuthStateChange()`, stores both `session` and `user` in React state, and exposes them through `useAuth()`.
 - `AuthProvider` also schedules `supabase.auth.refreshSession()` one minute before `session.expires_at`, so active users refresh tokens before the current session expires.
+- `AuthProvider` now exposes a shared `signOut()` action. It attempts `supabase.auth.signOut()`, clears the in-memory auth state, removes the local dev fallback session from `localStorage`, and leaves the router in a logged-out state that sends the user back to `/login`.
 - `src/routes/ProtectedRoute.tsx` no longer talks to Supabase directly. It consumes `useAuth()`, renders its `children` when a user exists, shows a loading screen while auth is hydrating, and redirects unauthenticated visitors to `/login`.
 - Routing now wraps the entire dashboard shell in a single `ProtectedRoute`, so child routes inherit auth protection without repeating the guard around every page.
 - Redirects preserve the originally requested route in router state. After a successful login, users are sent back to that route; otherwise the fallback destination is `/dashboard`.
 - `src/pages/Login.tsx` keeps `email` and `password` as controlled inputs, validates them before submit, surfaces inline field errors plus Supabase auth errors, and links directly to account creation plus password reset.
+- `src/components/AppLayout.tsx` reads the active user directly from `AuthContext` and shows the signed-in email plus avatar initials in the dashboard navigation. Desktop users get a dropdown account menu; mobile users get the same session controls inside the navigation drawer.
 - During local Vite development only, `/login` also exposes a built-in fallback account for UI testing: `dev@nick.local` / `nick-dev-password` unless you override those values with `VITE_DEV_AUTH_EMAIL` and `VITE_DEV_AUTH_PASSWORD`.
 - `src/pages/SignUp.tsx` collects `email` and `password`, calls `supabase.auth.signUp({ email, password })`, surfaces weak-password or duplicate-account errors, and tells the user to check their inbox for email confirmation after a successful registration.
 - `src/pages/ResetPassword.tsx` collects an email address, calls `supabase.auth.resetPasswordForEmail(email)`, and shows success/failure messaging for password-recovery requests.
 - `Sign In` calls `signInWithPassword({ email, password })`. `Send Magic Link` calls `signInWithOtp({ email, options: { emailRedirectTo } })`. AuthContext receives the resulting session update and unlocks protected routes centrally.
+- Sign-out flow: use the account menu in the top navigation or the mobile drawer action. Both routes call `AuthContext.signOut()`, clear the shared session immediately, and navigate to `/login` so protected pages cannot linger after logout.
 - Account creation flow: open `/signup`, submit email plus password, then confirm the account through the email Supabase sends before returning to `/login`.
 - Password reset flow: open `/reset-password`, submit the account email, and follow the recovery instructions delivered by Supabase.
 - `src/lib/supabaseClient.ts` now exports a lazy client proxy and leaves token refresh ownership to `AuthProvider`, so auth imports stay safe while refresh timing lives in one place.
@@ -82,9 +85,9 @@ npm run lint
 - `src/pages/Login.tsx` – public authentication page with validated password and magic-link flows.
 - `src/pages/SignUp.tsx` – public account-creation page with controlled inputs, Supabase `signUp`, and confirmation messaging.
 - `src/pages/ResetPassword.tsx` – public password-reset request page with Supabase email recovery.
-- `src/components/AppLayout.tsx` – main dashboard frame, Link-based navigation, and `<Outlet>` for child routes.
+- `src/components/AppLayout.tsx` – main dashboard frame, session-aware navigation, desktop account dropdown, mobile drawer, and `<Outlet>` for child routes.
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
-- `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, listens for Supabase auth changes, and refreshes tokens before expiry.
+- `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, listens for Supabase auth changes, refreshes tokens before expiry, and centralizes sign-out cleanup.
 - `src/hooks/use-auth.ts` – small hook wrapper around `AuthContext` so routes/pages can consume auth state without importing the context object directly.
 - `src/routes/ProtectedRoute.tsx` – context-driven guard for protected dashboard routes.
 - `src/pages/NotFound.tsx` – accessible 404 with recovery links back to the dashboard or chat.

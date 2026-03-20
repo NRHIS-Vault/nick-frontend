@@ -109,6 +109,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(isConfigured || isLocalDevAuthEnabled);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const clearAuthState = () => {
+    if (refreshTimerRef.current !== null) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
+    clearLocalDevAuth();
+    setSession(null);
+    setUser(null);
+    setIsLoading(false);
+  };
+
   // Step 2: expose a local dev-only credential check so the login page can unlock
   // the dashboard without a live Supabase account while `npm run dev` is active.
   const signInWithLocalDevAccount = async (email: string, password: string) => {
@@ -137,6 +149,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
 
     return { matched: true, error: null };
+  };
+
+  const signOut = async () => {
+    let signOutError: Error | null = null;
+
+    try {
+      // Step 2a: revoke the Supabase session when the app is configured so the current
+      // browser session is invalidated before we route the user back to `/login`.
+      if (isConfigured) {
+        const { error } = await getSupabaseClient().auth.signOut();
+
+        if (error) {
+          signOutError = error;
+        }
+      }
+    } catch (error) {
+      signOutError =
+        error instanceof Error ? error : new Error("Failed to sign out of the current session.");
+    } finally {
+      // Step 2b: always clear the shared auth state locally so protected routes lock
+      // immediately, including the local dev fallback session stored in localStorage.
+      clearAuthState();
+    }
+
+    if (signOutError) {
+      console.error("Failed to fully sign out of Supabase.", signOutError);
+      throw signOutError;
+    }
   };
 
   useEffect(() => {
@@ -266,6 +306,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isConfigured,
         isLocalDevAuthEnabled,
         localDevCredentials,
+        signOut,
         signInWithLocalDevAccount,
       }}
     >
