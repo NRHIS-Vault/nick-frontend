@@ -105,6 +105,7 @@ npm run lint
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
 - `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, loads role/subscription profile fields, refreshes tokens before expiry, and centralizes sign-out cleanup.
 - `src/hooks/use-auth.ts` – small hook wrapper around `AuthContext` so routes/pages can consume auth state without importing the context object directly.
+- `src/hooks/useChat.ts` – streaming chat hook that keeps the transcript in React state, posts `{ messages, tools }` to the chat backend, parses SSE chunks from `ReadableStream`, and appends token deltas onto the active assistant message.
 - `src/hooks/use-subscription.ts` – tiny hook that converts `subscription_status` into a single boolean for paywall gating.
 - `src/routes/ProtectedRoute.tsx` – context-driven guard for protected dashboard routes.
 - `supabase/migrations/20260320_create_profiles.sql` – SQL contract for the `profiles` table, trigger, and RLS policies used by the frontend auth flow.
@@ -124,6 +125,20 @@ npm run lint
 - Cloudflare Pages Functions (in `nick-site/functions`) expose sample JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, `/rhnisIdentity`.
 - Components now use `@tanstack/react-query` + the helpers in `src/lib/api.ts` to fetch those routes, with built-in loading, empty, and error (retry) states.
 - Set `VITE_API_BASE` if the workers live on another domain; leave it blank to call them from the same origin during Pages previews.
+
+## Chat usage
+- `src/components/ChatInterface.tsx` now uses `src/hooks/useChat.ts` instead of a local timeout-based mock response.
+- `useChat()` defaults to calling `/chat`, which matches the current Cloudflare Pages Function in `nick-site/functions/chat.ts`. When the dashboard and worker run on different hosts, set `VITE_API_BASE` so the hook resolves the request to the correct origin.
+- The hook sends the current conversation as `{ messages, tools }`, reads the backend's `text/event-stream` response via `ReadableStream`, parses each SSE chunk, and appends every `token` event onto the active assistant bubble.
+- The hook also listens for `meta`, `tool_call`, `tool_result`, `error`, and `done` events so the UI can show streaming/tool status and surface backend failures cleanly.
+- Example:
+```tsx
+import { useChat } from "@/hooks/useChat";
+
+const { messages, isStreaming, streamStatus, error, sendMessage } = useChat();
+
+await sendMessage("Show my open trades");
+```
 
 ## UI state helpers
 - `Skeleton` – animated placeholder; apply height/width via `className`.

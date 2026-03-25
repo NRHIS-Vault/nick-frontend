@@ -1,142 +1,186 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Volume2, Languages } from 'lucide-react';
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'nick';
-  timestamp: Date;
-  isTranslated?: boolean;
-}
+import React, { useEffect, useRef, useState } from "react";
+import { Send, Mic, Volume2, Languages } from "lucide-react";
+import { useChat } from "@/hooks/useChat";
 
 const ChatInterface: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Hello! I\'m Nick, your AI assistant. How can I help you today?',
-      sender: 'nick',
-      timestamp: new Date()
-    }
-  ]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [isListening, setIsListening] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+  // The chat hook owns the conversation transcript and streaming lifecycle.
+  const { messages, isStreaming, streamStatus, error, sendMessage } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Keep the newest token visible as the assistant message grows.
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isStreaming, streamStatus]);
 
-  const sendMessage = () => {
-    if (!inputText.trim()) return;
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: 'user',
-      timestamp: new Date()
-    };
+    const trimmedInput = inputText.trim();
+    if (!trimmedInput || isStreaming) {
+      return;
+    }
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
-    setIsTyping(true);
-
-    // Simulate Nick's response
-    setTimeout(() => {
-      const nickResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: 'I understand your request. Let me help you with that right away.',
-        sender: 'nick',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, nickResponse]);
-      setIsTyping(false);
-    }, 1500);
+    setInputText("");
+    await sendMessage(trimmedInput);
   };
 
   const toggleListening = () => {
-    setIsListening(!isListening);
+    setIsListening((currentValue) => !currentValue);
   };
 
   return (
-    <div className="flex flex-col h-96 bg-card rounded-lg border border-border shadow-sm">
-      {/* Chat Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
+    <div className="flex h-[32rem] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      {/* Header stays fixed while the transcript area scrolls underneath it. */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-sm font-bold">N</span>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary">
+            <span className="text-sm font-bold text-primary-foreground">N</span>
           </div>
           <div>
-            <h3 className="text-foreground font-medium">Nick AI</h3>
-            <p className="text-muted-foreground text-xs">Always listening</p>
+            <h3 className="font-medium text-foreground">Nick AI</h3>
+            <p className="text-xs text-muted-foreground">
+              {streamStatus || (isStreaming ? "Streaming reply..." : "Ready to help")}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            type="button"
+            disabled={isStreaming}
+            className="p-2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <Volume2 size={16} />
           </button>
-          <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            type="button"
+            disabled={isStreaming}
+            className="p-2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <Languages size={16} />
           </button>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-surface-muted text-foreground'}`}>
-              <p className="text-sm">{message.text}</p>
-              <p className="text-xs opacity-70 mt-1">
-                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-          </div>
-        ))}
-        
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-surface-muted text-foreground px-4 py-2 rounded-lg border border-border/60">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+      {/* Message bubbles use separate alignment and color treatments for user vs assistant. */}
+      <div className="flex-1 space-y-4 overflow-y-auto bg-background/40 px-4 py-4">
+        {messages.map((message) => {
+          const isUser = message.role === "user";
+
+          return (
+            <div
+              key={message.id}
+              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm lg:max-w-xl ${
+                  isUser
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border/60 bg-surface-muted text-foreground"
+                }`}
+              >
+                <p className="whitespace-pre-wrap text-sm leading-6">
+                  {message.content}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-3 text-[11px] opacity-70">
+                  <span>{isUser ? "You" : "Nick"}</span>
+                  <span>
+                    {message.createdAt.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                {message.role === "assistant" && message.status === "streaming" && (
+                  <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <div className="flex gap-1">
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground" />
+                      <div
+                        className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground"
+                        style={{ animationDelay: "0.1s" }}
+                      />
+                      <div
+                        className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground"
+                        style={{ animationDelay: "0.2s" }}
+                      />
+                    </div>
+                    <span>Streaming response</span>
+                  </div>
+                )}
               </div>
             </div>
+          );
+        })}
+
+        {/* A separate loading row makes the streaming state visible even before the first token arrives. */}
+        {isStreaming &&
+          !messages.some(
+            (message) =>
+              message.role === "assistant" &&
+              message.status === "streaming" &&
+              message.content.trim()
+          ) && (
+          <div className="flex justify-start">
+            <div className="rounded-2xl border border-border/60 bg-surface-muted px-4 py-3 text-foreground shadow-sm">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex gap-1">
+                  <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground" />
+                  <div
+                    className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground"
+                    style={{ animationDelay: "0.1s" }}
+                  />
+                  <div
+                    className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground"
+                    style={{ animationDelay: "0.2s" }}
+                  />
+                </div>
+                <span>{streamStatus || "Nick is thinking..."}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {error}
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-border">
+      {/* The form submits to the streaming hook and stays disabled while a response is in flight. */}
+      <form onSubmit={handleSubmit} className="border-t border-border p-4">
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={toggleListening}
-            className={`p-2 rounded-full transition-colors ${isListening ? 'bg-destructive text-destructive-foreground' : 'bg-surface-muted text-muted-foreground hover:text-foreground border border-border'}`}
+            disabled={isStreaming}
+            className={`rounded-full p-2 transition-colors ${
+              isListening
+                ? "bg-destructive text-destructive-foreground"
+                : "border border-border bg-surface-muted text-muted-foreground hover:text-foreground"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
           >
             <Mic size={16} />
           </button>
           <input
             type="text"
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Type your message..."
-            className="flex-1 bg-surface-muted text-foreground px-3 py-2 rounded-lg border border-border focus:border-primary focus:outline-none"
+            onChange={(event) => setInputText(event.target.value)}
+            placeholder={isStreaming ? "Waiting for Nick..." : "Type your message..."}
+            disabled={isStreaming}
+            className="flex-1 rounded-lg border border-border bg-surface-muted px-3 py-2 text-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
-            onClick={sendMessage}
-            className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+            type="submit"
+            disabled={!inputText.trim() || isStreaming}
+            className="rounded-full bg-primary p-2 text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Send size={16} />
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };
