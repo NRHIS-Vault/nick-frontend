@@ -93,7 +93,7 @@ const safeJsonParse = (value: string): unknown => {
 
 export const useChat = ({
   endpoint = "/chat",
-  tools = ["get_leads", "get_trades"],
+  tools = ["searchLeads", "fetchTrades"],
   initialMessages = [defaultWelcomeMessage],
 }: UseChatOptions = {}) => {
   // Message history lives in hook state so the UI can render a full conversation and resend
