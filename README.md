@@ -131,6 +131,8 @@ npm run lint
 - `useChat()` defaults to calling `/chat`, which matches the current Cloudflare Pages Function in `nick-site/functions/chat.ts`. When the dashboard and worker run on different hosts, set `VITE_API_BASE` so the hook resolves the request to the correct origin.
 - `useChat()` now defaults to the canonical tool names `searchLeads` and `fetchTrades`, which the backend resolves through its allowlisted tool registry.
 - The hook sends the current conversation as `{ messages, tools }`, reads the backend's `text/event-stream` response via `ReadableStream`, parses each SSE chunk, and appends every `token` event onto the active assistant bubble.
+- On mount, `useChat()` calls `/chat-history` with the current Supabase access token, hydrates the most recent conversation into local state, and reuses that `conversationId` for later sends.
+- The chat worker persists both the latest user prompt and the completed assistant reply into `public.chat_messages`, grouped under `public.conversations`.
 - The hook also listens for `meta`, `tool_call`, `tool_result`, `error`, and `done` events so the UI can show streaming/tool status and surface backend failures cleanly.
 - Example:
 ```tsx

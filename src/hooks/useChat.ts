@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { config } from "@/lib/config";
+import { useAuth } from "@/hooks/use-auth";
 
 export type ChatMessageRole = "user" | "assistant";
 export type ChatMessageStatus = "complete" | "streaming" | "error";
@@ -10,6 +11,14 @@ export interface ChatMessage {
   content: string;
   createdAt: Date;
   status: ChatMessageStatus;
+}
+
+export interface ChatConversation {
+  id: string;
+  title: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  messages: ChatMessage[];
 }
 
 type UseChatOptions = {
@@ -91,22 +100,79 @@ const safeJsonParse = (value: string): unknown => {
   }
 };
 
+const mapPersistedMessage = (message: Record<string, unknown>): ChatMessage | null => {
+  if (
+    typeof message.id !== "string" ||
+    (message.role !== "user" && message.role !== "assistant") ||
+    typeof message.content !== "string" ||
+    typeof message.created_at !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: new Date(message.created_at),
+    status: "complete",
+  };
+};
+
+const mapPersistedConversation = (
+  conversation: Record<string, unknown>
+): ChatConversation | null => {
+  if (
+    typeof conversation.id !== "string" ||
+    typeof conversation.created_at !== "string" ||
+    typeof conversation.updated_at !== "string" ||
+    !Array.isArray(conversation.messages)
+  ) {
+    return null;
+  }
+
+  const messages = conversation.messages
+    .map((message) =>
+      message && typeof message === "object"
+        ? mapPersistedMessage(message as Record<string, unknown>)
+        : null
+    )
+    .filter((message): message is ChatMessage => message !== null);
+
+  return {
+    id: conversation.id,
+    title: typeof conversation.title === "string" ? conversation.title : null,
+    createdAt: new Date(conversation.created_at),
+    updatedAt: new Date(conversation.updated_at),
+    messages,
+  };
+};
+
 export const useChat = ({
   endpoint = "/chat",
   tools = ["searchLeads", "fetchTrades"],
   initialMessages = [defaultWelcomeMessage],
 }: UseChatOptions = {}) => {
+  const { isConfigured, session, user } = useAuth();
   // Message history lives in hook state so the UI can render a full conversation and resend
   // the entire transcript to the backend on each prompt.
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  // The active conversation id is reused on each send so later messages append to the same
+  // persisted transcript instead of creating a brand-new conversation each time.
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  // The worker returns grouped history by conversation; we keep it here for future chat-session UI.
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
   // `isStreaming` drives the disabled input state and typing indicator while tokens arrive.
   const [isStreaming, setIsStreaming] = useState(false);
+  // `isHydratingHistory` tells the UI that we are fetching persisted chat history on mount.
+  const [isHydratingHistory, setIsHydratingHistory] = useState(false);
   // A short status line lets the UI explain whether we are connecting, streaming, or using a tool.
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   // Transport/provider errors are surfaced separately from the assistant transcript.
   const [error, setError] = useState<string | null>(null);
   // Keep a handle to the current request so it can be aborted on unmount.
   const activeRequestRef = useRef<AbortController | null>(null);
+  const hydratedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -114,14 +180,100 @@ export const useChat = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (!isConfigured || !session?.access_token || !user?.id || user.id === "local-dev-user") {
+      return;
+    }
+
+    if (hydratedUserIdRef.current === user.id) {
+      return;
+    }
+
+    hydratedUserIdRef.current = user.id;
+    let isCancelled = false;
+
+    const hydrateChatHistory = async () => {
+      setIsHydratingHistory(true);
+
+      try {
+        // History is fetched with the user's Supabase access token so the backend can
+        // scope the result set to that authenticated user before returning any messages.
+        const response = await fetch(buildChatUrl("/chat-history"), {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const details = await response.text();
+          throw new Error(
+            details
+              ? `Chat history request failed (${response.status}): ${details}`
+              : `Chat history request failed (${response.status} ${response.statusText})`
+          );
+        }
+
+        const payload = (await response.json()) as {
+          conversations?: Array<Record<string, unknown>>;
+        };
+
+        if (isCancelled) {
+          return;
+        }
+
+        const nextConversations = Array.isArray(payload.conversations)
+          ? payload.conversations
+              .map((conversation) => mapPersistedConversation(conversation))
+              .filter(
+                (conversation): conversation is ChatConversation => conversation !== null
+              )
+          : [];
+
+        setConversations(nextConversations);
+
+        if (nextConversations[0]) {
+          // The latest conversation becomes the active transcript so the next `sendMessage`
+          // call continues that persisted session instead of forking a new one immediately.
+          setConversationId(nextConversations[0].id);
+          setMessages(
+            nextConversations[0].messages.length
+              ? nextConversations[0].messages
+              : initialMessages
+          );
+        }
+      } catch (caughtError) {
+        if (!isCancelled) {
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Unable to load chat history."
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsHydratingHistory(false);
+        }
+      }
+    };
+
+    // Hydrate the most recent persisted conversation as soon as the authenticated session exists.
+    void hydrateChatHistory();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [initialMessages, isConfigured, session?.access_token, user?.id]);
+
   const sendMessage = async (rawInput: string) => {
     const content = rawInput.trim();
-    if (!content || isStreaming) {
+    if (!content || isStreaming || isHydratingHistory) {
       return;
     }
 
     const userMessage = createMessage("user", content);
     const assistantMessage = createMessage("assistant", "", "streaming");
+    const nextConversationId = conversationId || crypto.randomUUID();
     const requestMessages = [...messages, userMessage].map((message) => ({
       role: message.role,
       content: message.content,
@@ -130,6 +282,7 @@ export const useChat = ({
     setError(null);
     setIsStreaming(true);
     setStreamStatus("Connecting to Nick AI...");
+    setConversationId(nextConversationId);
     setMessages((currentMessages) => [
       ...currentMessages,
       userMessage,
@@ -149,10 +302,16 @@ export const useChat = ({
         headers: {
           "Content-Type": "application/json",
           Accept: "text/event-stream",
+          ...(isConfigured && session?.access_token && user?.id !== "local-dev-user"
+            ? {
+                Authorization: `Bearer ${session.access_token}`,
+              }
+            : {}),
         },
         body: JSON.stringify({
           messages: requestMessages,
           tools,
+          conversationId: nextConversationId,
         }),
       });
 
@@ -217,6 +376,18 @@ export const useChat = ({
         const payload = safeJsonParse(streamEvent.data);
 
         if (streamEvent.event === "meta") {
+          const nextConversationId =
+            payload &&
+            typeof payload === "object" &&
+            "conversationId" in payload &&
+            typeof payload.conversationId === "string"
+              ? payload.conversationId
+              : null;
+
+          if (nextConversationId) {
+            setConversationId(nextConversationId);
+          }
+
           setStreamStatus("Nick is preparing a response...");
           return;
         }
@@ -337,7 +508,10 @@ export const useChat = ({
 
   return {
     messages,
+    conversations,
+    conversationId,
     isStreaming,
+    isHydratingHistory,
     streamStatus,
     error,
     sendMessage,
