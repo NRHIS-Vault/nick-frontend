@@ -48,6 +48,13 @@ npm run preview # serves the production build locally
 npm run lint
 ```
 
+## Testing
+```bash
+npm test
+```
+- `src/hooks/useChat.test.tsx` mocks both `/chat-history` and the streaming `/chat` endpoint so the hook can be verified without a live worker or LLM provider.
+- `src/test/setup.ts` performs shared Testing Library cleanup between hook tests.
+
 ## Environment setup
 - Copy the sample env file: `cp .env.example .env`
 - Required keys (all `VITE_` so Vite exposes them to the client bundle):
@@ -106,6 +113,7 @@ npm run lint
 - `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, loads role/subscription profile fields, refreshes tokens before expiry, and centralizes sign-out cleanup.
 - `src/hooks/use-auth.ts` – small hook wrapper around `AuthContext` so routes/pages can consume auth state without importing the context object directly.
 - `src/hooks/useChat.ts` – streaming chat hook that keeps the transcript in React state, posts `{ messages, tools }` to the chat backend, parses SSE chunks from `ReadableStream`, and appends token deltas onto the active assistant message.
+- `src/hooks/useChat.test.tsx` – Vitest coverage for history hydration and streaming token handling.
 - `src/hooks/use-subscription.ts` – tiny hook that converts `subscription_status` into a single boolean for paywall gating.
 - `src/routes/ProtectedRoute.tsx` – context-driven guard for protected dashboard routes.
 - `supabase/migrations/20260320_create_profiles.sql` – SQL contract for the `profiles` table, trigger, and RLS policies used by the frontend auth flow.
@@ -118,6 +126,7 @@ npm run lint
 - `src/lib/apiClient.ts` – generic `apiRequest<T>` wrapper around `fetch` with descriptive errors.
 - `src/lib/types.ts` – shared TypeScript interfaces for all API payloads (stats, leads, workers, trades, customers, identity).
 - `src/lib/supabaseClient.ts` – singleton Supabase client plus auth/profile helpers.
+- `src/test/setup.ts` – shared test cleanup for hook/component tests.
 - UI states: `src/components/ui/skeleton.tsx`, `src/components/ui/empty-state.tsx`, `src/components/ui/error-state.tsx` for consistent loading/empty/error rendering.
 - `src/index.css` – Tailwind tokens/base.
 
@@ -134,6 +143,7 @@ npm run lint
 - On mount, `useChat()` calls `/chat-history` with the current Supabase access token, hydrates the most recent conversation into local state, and reuses that `conversationId` for later sends.
 - The chat worker persists both the latest user prompt and the completed assistant reply into `public.chat_messages`, grouped under `public.conversations`.
 - The hook also listens for `meta`, `tool_call`, `tool_result`, `error`, and `done` events so the UI can show streaming/tool status and surface backend failures cleanly.
+- `src/hooks/useChat.test.tsx` covers both the hydration fetch and a mocked SSE stream so regressions in token concatenation or auth headers are caught without calling the real backend.
 - Example:
 ```tsx
 import { useChat } from "@/hooks/useChat";

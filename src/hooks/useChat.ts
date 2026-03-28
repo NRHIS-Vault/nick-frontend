@@ -154,9 +154,12 @@ export const useChat = ({
   initialMessages = [defaultWelcomeMessage],
 }: UseChatOptions = {}) => {
   const { isConfigured, session, user } = useAuth();
+  // Treat the caller's initial transcript as a mount-time seed. Keeping it in a ref avoids
+  // retriggering the hydration effect on every render when the default array literal is used.
+  const initialMessagesRef = useRef(initialMessages);
   // Message history lives in hook state so the UI can render a full conversation and resend
   // the entire transcript to the backend on each prompt.
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessagesRef.current);
   // The active conversation id is reused on each send so later messages append to the same
   // persisted transcript instead of creating a brand-new conversation each time.
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -239,7 +242,7 @@ export const useChat = ({
           setMessages(
             nextConversations[0].messages.length
               ? nextConversations[0].messages
-              : initialMessages
+              : initialMessagesRef.current
           );
         }
       } catch (caughtError) {
@@ -263,7 +266,7 @@ export const useChat = ({
     return () => {
       isCancelled = true;
     };
-  }, [initialMessages, isConfigured, session?.access_token, user?.id]);
+  }, [isConfigured, session?.access_token, user?.id]);
 
   const sendMessage = async (rawInput: string) => {
     const content = rawInput.trim();
