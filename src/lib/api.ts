@@ -4,6 +4,8 @@ import {
   LeadManagementResponse,
   WorkersResponse,
   BusinessCardsResponse,
+  LeadBotDateRange,
+  LeadBotPlatformFilter,
   LeadBotResponse,
   TradingBotResponse,
   CustomerPortalResponse,
@@ -16,6 +18,8 @@ export type {
   LeadManagementResponse,
   WorkersResponse,
   BusinessCardsResponse,
+  LeadBotDateRange,
+  LeadBotPlatformFilter,
   LeadBotResponse,
   TradingBotResponse,
   CustomerPortalResponse,
@@ -36,8 +40,26 @@ export const getWorkers = () =>
 export const getBusinessCards = () =>
   apiRequest<BusinessCardsResponse>("/businessCards");
 
-export const getLeadBotData = () =>
-  apiRequest<LeadBotResponse>("/leadBot");
+export const getLeadBotData = ({
+  platform = "all",
+  dateRange = "30",
+  search = "",
+}: {
+  platform?: LeadBotPlatformFilter;
+  dateRange?: LeadBotDateRange;
+  search?: string;
+} = {}) => {
+  const params = new URLSearchParams({
+    platform,
+    dateRange,
+  });
+
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+
+  return apiRequest<LeadBotResponse>(`/leadBot?${params.toString()}`);
+};
 
 export const getTradingBotData = () =>
   apiRequest<TradingBotResponse>("/tradingBot");

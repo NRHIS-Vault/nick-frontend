@@ -103,6 +103,8 @@ export interface BusinessCardsResponse {
 // LeadBot
 export type CampaignStatus = "ACTIVE" | "SCHEDULED" | "COMPLETED";
 export type LeadBotLeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED";
+export type LeadBotPlatformFilter = "all" | "meta" | "instagram" | "tiktok";
+export type LeadBotDateRange = "7" | "30" | "90";
 
 export interface LeadBotOverview {
   totalLeads: number;
@@ -115,7 +117,11 @@ export interface Campaign {
   id: string;
   platform: string;
   content: string;
+  timestamp: string;
   reach: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
   leads: number;
   engagement: number;
   status: CampaignStatus;
@@ -144,6 +150,7 @@ export interface LeadBotResponse {
   campaigns: Campaign[];
   platforms: LeadBotPlatform[];
   recentLeads: LeadBotRecentLead[];
+  errors?: string[];
 }
 
 // TradingBot

@@ -114,6 +114,7 @@ npm test
 - `src/hooks/use-auth.ts` – small hook wrapper around `AuthContext` so routes/pages can consume auth state without importing the context object directly.
 - `src/hooks/useChat.ts` – streaming chat hook that keeps the transcript in React state, posts `{ messages, tools }` to the chat backend, parses SSE chunks from `ReadableStream`, and appends token deltas onto the active assistant message.
 - `src/hooks/useChat.test.tsx` – Vitest coverage for history hydration and streaming token handling.
+- `src/hooks/useDebounce.ts` – tiny debounce helper used by worker-backed filter UIs such as LeadBot search.
 - `src/hooks/use-subscription.ts` – tiny hook that converts `subscription_status` into a single boolean for paywall gating.
 - `src/routes/ProtectedRoute.tsx` – context-driven guard for protected dashboard routes.
 - `supabase/migrations/20260320_create_profiles.sql` – SQL contract for the `profiles` table, trigger, and RLS policies used by the frontend auth flow.
@@ -134,6 +135,12 @@ npm test
 - Cloudflare Pages Functions (in `nick-site/functions`) expose sample JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, `/rhnisIdentity`.
 - Components now use `@tanstack/react-query` + the helpers in `src/lib/api.ts` to fetch those routes, with built-in loading, empty, and error (retry) states.
 - Set `VITE_API_BASE` if the workers live on another domain; leave it blank to call them from the same origin during Pages previews.
+
+## LeadBot usage
+- `src/components/LeadBot.tsx` now queries `/leadBot` with `platform`, `dateRange`, and debounced `search` params instead of rendering a static mock-only panel.
+- The platform tabs feed the React Query key, the date-range dropdown narrows the worker-side window, and `src/hooks/useDebounce.ts` delays the search refetch until typing pauses.
+- Campaign metrics are rendered from the worker’s normalized `impressions`, `clicks`, and `conversions` fields, while the lead table paginates client-side so page changes stay instant.
+- The worker still returns platform connection summaries and any provider sync warnings, so the panel can show partial data when one social API succeeds and another fails.
 
 ## Chat usage
 - `src/components/ChatInterface.tsx` now uses `src/hooks/useChat.ts` instead of a local timeout-based mock response.
