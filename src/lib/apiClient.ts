@@ -2,7 +2,7 @@ import { config } from "./config";
 
 // Build a URL that honors VITE_API_BASE while allowing absolute URLs for tests.
 const baseUrl = (config.apiBase || "").replace(/\/$/, "");
-const buildUrl = (url: string) =>
+export const resolveApiUrl = (url: string) =>
   /^https?:\/\//i.test(url) ? url : `${baseUrl}${url.startsWith("/") ? url : `/${url}`}`;
 
 /**
@@ -12,7 +12,7 @@ const buildUrl = (url: string) =>
  * - Accepts standard fetch RequestInit options (method, headers, body, etc.).
  */
 export async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const finalUrl = buildUrl(url);
+  const finalUrl = resolveApiUrl(url);
   const mergedOptions: RequestInit = {
     headers: {
       Accept: "application/json",

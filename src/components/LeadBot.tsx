@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -42,6 +42,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { resolveApiUrl } from "@/lib/apiClient";
+import { config } from "@/lib/config";
 
 type Campaign = LeadBotResponse["campaigns"][number];
 type Lead = LeadBotResponse["recentLeads"][number];
@@ -66,6 +68,10 @@ const DATE_RANGE_OPTIONS: Array<{
 ];
 
 const LEADS_PER_PAGE = 8;
+const LIVE_LEAD_BUFFER_SIZE = 50;
+const STREAM_HEARTBEAT_TIMEOUT_MS = 45_000;
+const STREAM_RECONNECT_BASE_MS = 2_000;
+const STREAM_RECONNECT_MAX_MS = 15_000;
 
 const renderCampaignStatus = (campaign: Campaign) => {
   if (campaign.status === "ACTIVE") {
@@ -97,16 +103,56 @@ const renderLeadStatus = (lead: Lead) => {
 
 const formatNumber = (value: number) => value.toLocaleString();
 
+const normalizeSearchFilter = (value: string) => value.trim().toLowerCase();
+
+const isLeadWithinRange = (timestamp: string, dateRange: LeadBotDateRange) =>
+  Date.now() - Date.parse(timestamp) <= Number(dateRange) * 24 * 60 * 60 * 1000;
+
+const leadMatchesPlatformFilter = (
+  lead: Lead,
+  platformFilter: LeadBotPlatformFilter
+) =>
+  platformFilter === "all" || lead.source.toLowerCase() === platformFilter;
+
+const leadMatchesSearch = (lead: Lead, searchFilter: string) =>
+  !searchFilter ||
+  [
+    lead.name,
+    lead.phone,
+    lead.service,
+    lead.source,
+    lead.status,
+  ].some((value) => value.toLowerCase().includes(searchFilter));
+
+const mergeRecentLeads = (baseLeads: Lead[], liveLeads: Lead[]) =>
+  Array.from(
+    [...baseLeads, ...liveLeads].reduce<Map<string, Lead>>((leadMap, lead) => {
+      leadMap.set(lead.id, lead);
+      return leadMap;
+    }, new Map<string, Lead>()).values()
+  )
+    .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
+    .slice(0, LIVE_LEAD_BUFFER_SIZE);
+
 export default function LeadBot() {
   const [autoPostingEnabled, setAutoPostingEnabled] = useState(true);
   const [platformFilter, setPlatformFilter] = useState<LeadBotPlatformFilter>("all");
   const [dateRange, setDateRange] = useState<LeadBotDateRange>("30");
   const [searchInput, setSearchInput] = useState("");
   const [leadPage, setLeadPage] = useState(1);
+  const [streamLeads, setStreamLeads] = useState<Lead[]>([]);
+  const [streamStatus, setStreamStatus] = useState<
+    "connecting" | "connected" | "reconnecting"
+  >("connecting");
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const heartbeatTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptRef = useRef(0);
 
   // Search input changes immediately for typing feedback, but the network request only updates
   // after the debounce interval so the worker is not hit on every single keypress.
   const debouncedSearch = useDebounce(searchInput, 350);
+  const normalizedSearch = normalizeSearchFilter(debouncedSearch);
 
   // React Query owns the worker fetch lifecycle. Any change to the filter key triggers a fresh
   // request to `/leadBot` with matching query parameters, and the worker returns filtered data.
@@ -124,8 +170,150 @@ export default function LeadBot() {
     setLeadPage(1);
   }, [platformFilter, dateRange, debouncedSearch]);
 
+  useEffect(() => {
+    const streamUrl = config.apiBase ? resolveApiUrl("/lead-stream") : "/api/lead-stream";
+    let isUnmounted = false;
+
+    const clearReconnectTimeout = () => {
+      if (reconnectTimeoutRef.current !== null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    };
+
+    const clearHeartbeatTimeout = () => {
+      if (heartbeatTimeoutRef.current !== null) {
+        window.clearTimeout(heartbeatTimeoutRef.current);
+        heartbeatTimeoutRef.current = null;
+      }
+    };
+
+    // The worker sends a `heartbeat` event every 15 seconds. If that heartbeat stops arriving,
+    // we assume the browser is stuck on a half-open socket and force a reconnect so the lead
+    // table does not silently freeze.
+    const scheduleHeartbeatDeadline = () => {
+      clearHeartbeatTimeout();
+      heartbeatTimeoutRef.current = window.setTimeout(() => {
+        if (isUnmounted) {
+          return;
+        }
+
+        eventSourceRef.current?.close();
+        eventSourceRef.current = null;
+        reconnectAttemptRef.current += 1;
+        setStreamStatus("reconnecting");
+        scheduleReconnect();
+      }, STREAM_HEARTBEAT_TIMEOUT_MS);
+    };
+
+    const scheduleReconnect = () => {
+      if (isUnmounted || reconnectTimeoutRef.current !== null) {
+        return;
+      }
+
+      const reconnectDelay = Math.min(
+        STREAM_RECONNECT_BASE_MS * 2 ** Math.max(reconnectAttemptRef.current - 1, 0),
+        STREAM_RECONNECT_MAX_MS
+      );
+
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connectToLeadStream();
+      }, reconnectDelay);
+    };
+
+    function connectToLeadStream() {
+      if (isUnmounted) {
+        return;
+      }
+
+      clearReconnectTimeout();
+      clearHeartbeatTimeout();
+      eventSourceRef.current?.close();
+      setStreamStatus(reconnectAttemptRef.current > 0 ? "reconnecting" : "connecting");
+
+      const stream = new EventSource(streamUrl);
+      eventSourceRef.current = stream;
+      scheduleHeartbeatDeadline();
+
+      stream.addEventListener("connected", () => {
+        if (isUnmounted || eventSourceRef.current !== stream) {
+          return;
+        }
+
+        reconnectAttemptRef.current = 0;
+        setStreamStatus("connected");
+        scheduleHeartbeatDeadline();
+      });
+
+      stream.addEventListener("heartbeat", () => {
+        if (isUnmounted || eventSourceRef.current !== stream) {
+          return;
+        }
+
+        scheduleHeartbeatDeadline();
+      });
+
+      stream.addEventListener("lead", (event) => {
+        if (isUnmounted || eventSourceRef.current !== stream) {
+          return;
+        }
+
+        try {
+          const incomingLead = JSON.parse((event as MessageEvent<string>).data) as Lead;
+
+          if (!incomingLead?.id) {
+            return;
+          }
+
+          // React Query still owns the worker fetch/filter lifecycle. The stream only appends
+          // brand-new rows between refetches so the lead table updates immediately on inserts.
+          setStreamLeads((currentLeads) => mergeRecentLeads(currentLeads, [incomingLead]));
+          scheduleHeartbeatDeadline();
+        } catch (error) {
+          console.error("Failed to parse lead stream event", error);
+        }
+      });
+
+      stream.addEventListener("stream-error", (event) => {
+        console.error("Lead stream reported an application error", event);
+      });
+
+      stream.onerror = () => {
+        if (isUnmounted || eventSourceRef.current !== stream) {
+          return;
+        }
+
+        clearHeartbeatTimeout();
+        stream.close();
+        eventSourceRef.current = null;
+        reconnectAttemptRef.current += 1;
+        setStreamStatus("reconnecting");
+        scheduleReconnect();
+      };
+    }
+
+    connectToLeadStream();
+
+    return () => {
+      isUnmounted = true;
+      clearReconnectTimeout();
+      clearHeartbeatTimeout();
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+    };
+  }, []);
+
   const campaigns = data?.campaigns ?? [];
-  const recentLeads = data?.recentLeads ?? [];
+  const recentLeads = mergeRecentLeads(
+    data?.recentLeads ?? [],
+    streamLeads.filter(
+      (lead) =>
+        leadMatchesPlatformFilter(lead, platformFilter) &&
+        isLeadWithinRange(lead.timestamp, dateRange) &&
+        leadMatchesSearch(lead, normalizedSearch)
+    )
+  );
   const platforms = data?.platforms ?? [];
   const overview = data?.overview;
   const workerErrors = data?.errors ?? [];
@@ -208,6 +396,9 @@ export default function LeadBot() {
             <h2 className="text-3xl font-bold tracking-tight">Lead Generation Bot</h2>
             <Badge variant={autoPostingEnabled ? "default" : "secondary"}>
               {autoPostingEnabled ? "ACTIVE" : "INACTIVE"}
+            </Badge>
+            <Badge variant={streamStatus === "connected" ? "default" : "secondary"}>
+              {streamStatus === "connected" ? "LIVE" : streamStatus.toUpperCase()}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -298,7 +489,7 @@ export default function LeadBot() {
               <Users className="h-5 w-5 text-primary" />
               <div>
                 <p className="text-sm text-muted-foreground">Filtered Leads</p>
-                <p className="text-2xl font-bold">{overview?.totalLeads ?? 0}</p>
+                <p className="text-2xl font-bold">{recentLeads.length || overview?.totalLeads || 0}</p>
               </div>
             </div>
           </CardContent>

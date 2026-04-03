@@ -141,6 +141,8 @@ npm test
 - The platform tabs feed the React Query key, the date-range dropdown narrows the worker-side window, and `src/hooks/useDebounce.ts` delays the search refetch until typing pauses.
 - Campaign metrics are rendered from the worker’s normalized `impressions`, `clicks`, and `conversions` fields, while the lead table paginates client-side so page changes stay instant.
 - The worker still returns platform connection summaries and any provider sync warnings, so the panel can show partial data when one social API succeeds and another fails.
+- `LeadBot` also opens an `EventSource` on mount for the live lead stream. With `VITE_API_BASE` configured it connects to `${VITE_API_BASE}/lead-stream`; otherwise it falls back to same-origin `/api/lead-stream`.
+- The live stream is fed by the worker's Supabase Realtime subscription on `public.social_leads`. `heartbeat` events keep the browser connection warm, `lead` events append newly inserted rows into local React state, and the component reconnects with backoff when the stream drops or the heartbeat goes stale.
 
 ## Chat usage
 - `src/components/ChatInterface.tsx` now uses `src/hooks/useChat.ts` instead of a local timeout-based mock response.
