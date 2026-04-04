@@ -53,7 +53,14 @@ npm run lint
 npm test
 ```
 - `src/hooks/useChat.test.tsx` mocks both `/chat-history` and the streaming `/chat` endpoint so the hook can be verified without a live worker or LLM provider.
+- `src/components/LeadBot.test.tsx` renders the LeadBot panel, simulates live `EventSource` updates, and verifies the Recent Leads table reflects streamed inserts and repeat-id merges.
 - `src/test/setup.ts` performs shared Testing Library cleanup between hook tests.
+
+Run only the LeadBot coverage while working on the live dashboard table:
+
+```bash
+npm test -- src/components/LeadBot.test.tsx
+```
 
 ## Environment setup
 - Copy the sample env file: `cp .env.example .env`
