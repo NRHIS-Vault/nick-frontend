@@ -34,7 +34,7 @@ Open the URL Vite prints (default http://localhost:5173).
 - `/leads` – `LeadManagement`
 - `/workers` – `WorkerControl`
 - `/chat` – Nick chat surface (avatar header + `ChatInterface`)
-- `/settings` – placeholder settings panel
+- `/settings` – settings panel with encrypted Trading Settings credential capture.
 - `*` – `NotFound` accessible 404 with dashboard/chat recovery links.
 
 ## Build & preview
@@ -117,6 +117,7 @@ npm test -- src/components/LeadBot.test.tsx
 - `src/components/AppLayout.tsx` – main dashboard frame, session-aware navigation, desktop account dropdown, mobile drawer, and `<Outlet>` for child routes.
 - `src/components/Paywall.tsx` – placeholder subscription gate for logged-in users whose `subscription_status` is not active.
 - Feature panels: `BusinessDashboard`, `LeadManagement`, `WorkerControl`, `BusinessCards`, `LeadBot`, `TradingBot`, `CustomerPortal`, `RHNISIdentity`, `NickAvatar`, `ChatInterface`.
+- `src/components/SettingsPanel.tsx` – dashboard settings page with the Trading Settings form for encrypted exchange credential submission.
 - `src/contexts/AuthContext.tsx` – shared auth provider that stores the active user/session, loads role/subscription profile fields, refreshes tokens before expiry, and centralizes sign-out cleanup.
 - `src/hooks/use-auth.ts` – small hook wrapper around `AuthContext` so routes/pages can consume auth state without importing the context object directly.
 - `src/hooks/useChat.ts` – streaming chat hook that keeps the transcript in React state, posts `{ messages, tools }` to the chat backend, parses SSE chunks from `ReadableStream`, and appends token deltas onto the active assistant message.
@@ -130,7 +131,7 @@ npm test -- src/components/LeadBot.test.tsx
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
 - `src/lib/config.ts` – typed access to env vars with safe fallbacks.
-- `src/lib/api.ts` – lightweight fetch helpers for the dashboard mock APIs (business stats, leads, workers, cards, LeadBot, TradingBot, customer portal, RHNIS).
+- `src/lib/api.ts` – lightweight fetch helpers for the dashboard APIs (business stats, leads, workers, cards, LeadBot, TradingBot, customer portal, RHNIS, and encrypted trading key saving).
 - `src/lib/apiClient.ts` – generic `apiRequest<T>` wrapper around `fetch` with descriptive errors.
 - `src/lib/types.ts` – shared TypeScript interfaces for all API payloads (stats, leads, workers, trades, customers, identity).
 - `src/lib/supabaseClient.ts` – singleton Supabase client plus auth/profile helpers.
@@ -181,6 +182,14 @@ if (isLoading) return <Skeleton className="h-24" />;
 if (isError) return <ErrorState onRetry={refetch} />;
 if (!data?.length) return <EmptyState action={<Button onClick={refetch}>Retry</Button>} />;
 ```
+
+## Trading Settings
+- `/settings` includes a Trading Settings form for `binance`, `coinbase`, `kraken`, `kucoin`, and `okx`.
+- Each exchange collects an API key and API secret. Blank exchanges are ignored so existing stored credentials remain unchanged; filling both fields saves or rotates that exchange.
+- The form sends `POST /trading/save-keys` through `src/lib/api.ts` with the current Supabase access token in the `Authorization` header. Local dev fallback auth cannot save keys because it is not a real Supabase session.
+- Stored credentials are never displayed again after saving. Use read-only exchange keys, disable withdrawal permissions, restrict by IP when supported, and rotate keys regularly.
+- Server setup lives in `nick-site/README.md`: configure `SUPABASE_URL`, `SUPABASE_KEY`, `TRADING_KEYS_ENCRYPTION_KEY`, and apply `supabase/migrations/20260408_exchange_keys.sql`.
+- Do not put exchange API keys, API secrets, or `TRADING_KEYS_ENCRYPTION_KEY` in any `VITE_` variable. Vite variables are bundled for browser access.
 
 ## Theming
 - Tokens are defined in `src/index.css` (light + dark) and surfaced through `tailwind.config.ts` (`background`, `foreground`, `card`, `surface`, `brand`, `primary`, etc.).

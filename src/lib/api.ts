@@ -7,6 +7,8 @@ import {
   LeadBotDateRange,
   LeadBotPlatformFilter,
   LeadBotResponse,
+  SaveTradingExchangeKeysResponse,
+  TradingExchangeKeyInput,
   TradingBotResponse,
   CustomerPortalResponse,
   RHNISIdentityResponse,
@@ -21,6 +23,8 @@ export type {
   LeadBotDateRange,
   LeadBotPlatformFilter,
   LeadBotResponse,
+  SaveTradingExchangeKeysResponse,
+  TradingExchangeKeyInput,
   TradingBotResponse,
   CustomerPortalResponse,
   RHNISIdentityResponse,
@@ -63,6 +67,22 @@ export const getLeadBotData = ({
 
 export const getTradingBotData = () =>
   apiRequest<TradingBotResponse>("/tradingBot");
+
+export const saveTradingExchangeKeys = ({
+  accessToken,
+  exchanges,
+}: {
+  accessToken: string;
+  exchanges: TradingExchangeKeyInput[];
+}) =>
+  apiRequest<SaveTradingExchangeKeysResponse>("/trading/save-keys", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ exchanges }),
+  });
 
 export const getCustomerPortalData = () =>
   apiRequest<CustomerPortalResponse>("/customerPortal");

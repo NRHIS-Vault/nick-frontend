@@ -14,6 +14,7 @@ import LeadManagement from "@/components/LeadManagement";
 import WorkerControl from "@/components/WorkerControl";
 import ChatInterface from "@/components/ChatInterface";
 import NickAvatar from "@/components/NickAvatar";
+import SettingsPanel from "@/components/SettingsPanel";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
@@ -30,16 +31,6 @@ const ChatPanel = () => (
       <p className="text-muted-foreground mt-2">Your Right Hand Nick Identity System</p>
     </div>
     <ChatInterface />
-  </div>
-);
-
-const SettingsPanel = () => (
-  <div className="space-y-4">
-    <h2 className="text-2xl font-bold">Settings</h2>
-    <p className="text-muted-foreground">
-      Account, workspace, and notification controls will live here. This route stays public-ready
-      while authentication is still being wired up.
-    </p>
   </div>
 );
 

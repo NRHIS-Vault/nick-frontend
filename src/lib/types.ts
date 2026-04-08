@@ -154,6 +154,13 @@ export interface LeadBotResponse {
 }
 
 // TradingBot
+export type SupportedTradingExchangeId =
+  | "binance"
+  | "coinbase"
+  | "kraken"
+  | "kucoin"
+  | "okx";
+
 export type TradeType = "BUY" | "SELL";
 export type TradeStatus = "OPEN" | "CLOSED" | "PENDING";
 
@@ -188,6 +195,18 @@ export interface TradingBotResponse {
   trades: Trade[];
   signals: Signal[];
   platforms: TradingPlatform[];
+}
+
+export interface TradingExchangeKeyInput {
+  exchangeId: SupportedTradingExchangeId;
+  apiKey: string;
+  secret: string;
+}
+
+export interface SaveTradingExchangeKeysResponse {
+  ok: boolean;
+  saved: SupportedTradingExchangeId[];
+  message?: string;
 }
 
 // Customer portal
