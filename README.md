@@ -54,12 +54,14 @@ npm test
 ```
 - `src/hooks/useChat.test.tsx` mocks both `/chat-history` and the streaming `/chat` endpoint so the hook can be verified without a live worker or LLM provider.
 - `src/components/LeadBot.test.tsx` renders the LeadBot panel, simulates live `EventSource` updates, and verifies the Recent Leads table reflects streamed inserts and repeat-id merges.
+- `src/components/TradingBot.test.tsx` renders the TradingBot panel, simulates live `EventSource` trading updates, and verifies the balance/signal/trade tables refresh without a real exchange connection.
 - `src/test/setup.ts` performs shared Testing Library cleanup between hook tests.
 
 Run only the LeadBot coverage while working on the live dashboard table:
 
 ```bash
 npm test -- src/components/LeadBot.test.tsx
+npm test -- src/components/TradingBot.test.tsx
 ```
 
 ## Environment setup
@@ -143,6 +145,7 @@ npm test -- src/components/LeadBot.test.tsx
 - Cloudflare Pages Functions (in `nick-site/functions`) expose sample JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, `/rhnisIdentity`.
 - Components now use `@tanstack/react-query` + the helpers in `src/lib/api.ts` to fetch those routes, with built-in loading, empty, and error (retry) states.
 - Set `VITE_API_BASE` if the workers live on another domain; leave it blank to call them from the same origin during Pages previews.
+- TradingBot also opens a streaming route: with `VITE_API_BASE` configured it connects to `${VITE_API_BASE}/trading/stream`; with no API base it falls back to same-origin `/api/trading/stream`.
 
 ## LeadBot usage
 - `src/components/LeadBot.tsx` now queries `/leadBot` with `platform`, `dateRange`, and debounced `search` params instead of rendering a static mock-only panel.
@@ -151,6 +154,13 @@ npm test -- src/components/LeadBot.test.tsx
 - The worker still returns platform connection summaries and any provider sync warnings, so the panel can show partial data when one social API succeeds and another fails.
 - `LeadBot` also opens an `EventSource` on mount for the live lead stream. With `VITE_API_BASE` configured it connects to `${VITE_API_BASE}/lead-stream`; otherwise it falls back to same-origin `/api/lead-stream`.
 - The live stream is fed by the worker's Supabase Realtime subscription on `public.social_leads`. `heartbeat` events keep the browser connection warm, `lead` events append newly inserted rows into local React state, and the component reconnects with backoff when the stream drops or the heartbeat goes stale.
+
+## TradingBot usage
+- `src/components/TradingBot.tsx` now keeps the existing `/tradingBot` React Query fetch for the initial paint, then layers an `EventSource` subscription on top so the page can render immediately while the worker opens exchange sockets.
+- The symbol input feeds a debounced SSE reconnect cycle. The component sends `symbols=...` to the worker, which normalizes the list for Binance and Coinbase before opening the upstream websocket subscriptions.
+- The worker emits normalized `provider-status`, `balance`, `trade`, `signal`, `heartbeat`, and `stream-error` events. `TradingBot` merges those events into local React state instead of refetching the whole panel on every market tick.
+- The component watches the stream heartbeat and force-reconnects with backoff if the SSE socket goes stale, so the dashboard does not silently stop updating after a network flap.
+- Public exchange market data can still stream without private API credentials. When the backend cannot open a private account channel, the UI keeps the market stream live and surfaces the provider warning inline instead of collapsing into a full-screen error.
 
 ## Chat usage
 - `src/components/ChatInterface.tsx` now uses `src/hooks/useChat.ts` instead of a local timeout-based mock response.

@@ -65,8 +65,21 @@ export const getLeadBotData = ({
   return apiRequest<LeadBotResponse>(`/leadBot?${params.toString()}`);
 };
 
-export const getTradingBotData = () =>
-  apiRequest<TradingBotResponse>("/tradingBot");
+export const getTradingBotData = ({
+  symbols,
+}: {
+  symbols?: string[];
+} = {}) => {
+  const params = new URLSearchParams();
+
+  if (symbols?.length) {
+    params.set("symbols", symbols.join(","));
+  }
+
+  return apiRequest<TradingBotResponse>(
+    params.size ? `/tradingBot?${params.toString()}` : "/tradingBot"
+  );
+};
 
 export const saveTradingExchangeKeys = ({
   accessToken,

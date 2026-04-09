@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, Users, DollarSign, Activity, ShoppingCart, Home, UtensilsCrossed } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Activity, ShoppingCart, Home, UtensilsCrossed, type LucideIcon } from 'lucide-react';
 import { getBusinessStats } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -16,7 +16,7 @@ const BusinessDashboard: React.FC = () => {
   const recentLeads = data?.recentLeads ?? [];
   const ncsStatus = data?.ncsStatus ?? [];
 
-  const iconByStat: Record<string, any> = {
+  const iconByStat: Record<string, LucideIcon> = {
     ecogen_sales: ShoppingCart,
     fencing_leads: Home,
     island_bwoy_orders: UtensilsCrossed,

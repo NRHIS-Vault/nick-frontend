@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Shield, Eye, Fingerprint, Radio, Download, Upload } from 'lucide-react';
+import { Shield, Eye, Fingerprint, Radio, Download, Upload, type LucideIcon } from 'lucide-react';
 import { getRHNISIdentity, type RHNISIdentityResponse } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -22,7 +22,7 @@ const RHNISIdentity: React.FC = () => {
   };
   const beaconSignature = data?.beaconSignature ?? 'RHNIS-PENDING';
 
-  const iconMap: Record<string, any> = {
+  const iconMap: Record<string, LucideIcon> = {
     fingerprint: Fingerprint,
     eye: Eye,
     radio: Radio,

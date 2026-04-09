@@ -160,6 +160,13 @@ export type SupportedTradingExchangeId =
   | "kraken"
   | "kucoin"
   | "okx";
+export type TradingProviderId = "binance" | "coinbase";
+export type TradingConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "error"
+  | "disconnected";
 
 export type TradeType = "BUY" | "SELL";
 export type TradeStatus = "OPEN" | "CLOSED" | "PENDING";
@@ -173,6 +180,10 @@ export interface Trade {
   profit: number;
   timestamp: string;
   status: TradeStatus;
+  exchange?: string;
+  provider?: TradingProviderId;
+  marketPrice?: number;
+  fee?: number;
 }
 
 export interface Signal {
@@ -181,12 +192,79 @@ export interface Signal {
   strength: number;
   confidence: number;
   timeframe: string;
+  exchange?: string;
+  provider?: TradingProviderId;
+  price?: number;
+  changePct?: number;
+  bid?: number | null;
+  ask?: number | null;
+  timestamp?: string;
+}
+
+export interface TradingBalanceUpdate {
+  id: string;
+  exchange: string;
+  provider: TradingProviderId;
+  asset: string;
+  currency: string;
+  totalBalance: number;
+  availableBalance: number;
+  lockedBalance: number;
+  change: number | null;
+  timestamp: string;
 }
 
 export interface TradingPlatform {
   name: string;
-  status: "connected" | "disconnected";
+  provider?: TradingProviderId;
+  status: TradingConnectionStatus;
   balance: number;
+  currency?: string;
+  message?: string;
+  updatedAt?: string;
+  marketStatus?: TradingConnectionStatus;
+  accountStatus?: TradingConnectionStatus;
+  reconnectAttempts?: number;
+  subscribedSymbols?: string[];
+}
+
+export interface TradingStreamInfo {
+  defaultSymbols: string[];
+  providers: TradingProviderId[];
+  reconnectDelayMs: number;
+}
+
+export interface TradingStreamConnectedPayload {
+  connectionId: string;
+  providers: TradingProviderId[];
+  symbols: string[];
+  heartbeatIntervalMs: number;
+  reconnectDelayMs: number;
+  platforms?: Array<{
+    provider: TradingProviderId;
+    exchange: string;
+    subscribedSymbols: string[];
+  }>;
+}
+
+export interface TradingProviderStatusEvent {
+  provider: TradingProviderId;
+  exchange: string;
+  scope: "market" | "account";
+  status: TradingConnectionStatus;
+  message: string;
+  reconnectAttempt: number;
+  timestamp: string;
+  subscribedSymbols: string[];
+}
+
+export interface TradingStreamErrorEvent {
+  provider?: TradingProviderId;
+  exchange?: string;
+  scope?: "market" | "account" | "stream";
+  message: string;
+  recoverable: boolean;
+  timestamp: string;
 }
 
 export interface TradingBotResponse {
@@ -195,6 +273,8 @@ export interface TradingBotResponse {
   trades: Trade[];
   signals: Signal[];
   platforms: TradingPlatform[];
+  balanceUpdates?: TradingBalanceUpdate[];
+  stream?: TradingStreamInfo;
 }
 
 export interface TradingExchangeKeyInput {
