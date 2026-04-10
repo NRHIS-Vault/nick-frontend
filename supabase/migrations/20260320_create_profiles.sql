@@ -5,7 +5,7 @@
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
-  role text not null default 'member' check (role in ('admin', 'member', 'viewer')),
+  role text not null default 'member' check (role in ('admin', 'paid', 'member', 'viewer')),
   subscription_status text not null default 'inactive'
     check (subscription_status in ('active', 'inactive', 'trialing', 'past_due', 'canceled')),
   full_name text,

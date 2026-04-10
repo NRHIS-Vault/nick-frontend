@@ -1,4 +1,5 @@
 import { apiRequest } from "./apiClient";
+import { config } from "./config";
 import {
   BusinessStatsResponse,
   LeadManagementResponse,
@@ -10,8 +11,11 @@ import {
   SaveTradingExchangeKeysResponse,
   TradingExchangeKeyInput,
   TradingBotResponse,
+  TradingCancelOrderResponse,
   CustomerPortalResponse,
   RHNISIdentityResponse,
+  TradingCreateOrderInput,
+  TradingExecuteOrderResponse,
 } from "./types";
 
 // Re-export types so existing imports remain valid.
@@ -26,11 +30,16 @@ export type {
   SaveTradingExchangeKeysResponse,
   TradingExchangeKeyInput,
   TradingBotResponse,
+  TradingCancelOrderResponse,
   CustomerPortalResponse,
   RHNISIdentityResponse,
+  TradingCreateOrderInput,
+  TradingExecuteOrderResponse,
 } from "./types";
 
 // --- Fetchers using the shared apiRequest helper ---
+
+const tradingOrdersPath = config.apiBase ? "/trading/orders" : "/api/trading/orders";
 
 export const getBusinessStats = () =>
   apiRequest<BusinessStatsResponse>("/businessStats");
@@ -95,6 +104,43 @@ export const saveTradingExchangeKeys = ({
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ exchanges }),
+  });
+
+export const placeTradingOrder = ({
+  accessToken,
+  order,
+}: {
+  accessToken: string;
+  order: TradingCreateOrderInput;
+}) =>
+  apiRequest<TradingExecuteOrderResponse>(tradingOrdersPath, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(order),
+  });
+
+export const cancelTradingOrder = ({
+  accessToken,
+  orderId,
+  symbol,
+}: {
+  accessToken: string;
+  orderId: string;
+  symbol?: string;
+}) =>
+  apiRequest<TradingCancelOrderResponse>(tradingOrdersPath, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      orderId,
+      symbol,
+    }),
   });
 
 export const getCustomerPortalData = () =>

@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TradingBotResponse } from "@/lib/types";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 vi.mock("@/lib/api", () => ({
   getTradingBotData: vi.fn(),
+  placeTradingOrder: vi.fn(),
+  cancelTradingOrder: vi.fn(),
 }));
 
 vi.mock("@/lib/config", () => ({
@@ -20,7 +23,27 @@ vi.mock("@/lib/config", () => ({
 }));
 
 import { getTradingBotData } from "@/lib/api";
+import { placeTradingOrder } from "@/lib/api";
+import { cancelTradingOrder } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 import TradingBot from "./TradingBot";
+
+const authState = vi.hoisted(() => ({
+  role: "paid",
+  session: {
+    access_token: "test-access-token",
+  },
+}));
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: vi.fn(() => authState),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({
+    toast: vi.fn(),
+  }),
+}));
 
 class MockEventSource {
   static instances: MockEventSource[] = [];
@@ -75,6 +98,9 @@ class MockEventSource {
 }
 
 const mockedGetTradingBotData = vi.mocked(getTradingBotData);
+const mockedPlaceTradingOrder = vi.mocked(placeTradingOrder);
+const mockedCancelTradingOrder = vi.mocked(cancelTradingOrder);
+const mockedUseAuth = vi.mocked(useAuth);
 
 const baseResponse: TradingBotResponse = {
   botStatus: { active: true },
@@ -172,14 +198,49 @@ const createWrapper = () => {
   });
 
   return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
+    </QueryClientProvider>
   );
 };
 
 describe("TradingBot", () => {
   beforeEach(() => {
+    mockedGetTradingBotData.mockReset();
+    mockedPlaceTradingOrder.mockReset();
+    mockedCancelTradingOrder.mockReset();
+    mockedUseAuth.mockReset();
+
     mockedGetTradingBotData.mockResolvedValue(baseResponse);
+    mockedPlaceTradingOrder.mockResolvedValue({
+      ok: true,
+      action: "create",
+      exchange: "binance",
+      symbol: "BTC/USDT",
+      side: "BUY",
+      type: "MARKET",
+      amount: 0.01,
+      price: null,
+      order: {
+        id: "order-1",
+      },
+    });
+    mockedCancelTradingOrder.mockResolvedValue({
+      ok: true,
+      action: "cancel",
+      exchange: "binance",
+      orderId: "trade-1",
+      symbol: "BTC/USDT",
+      order: {
+        id: "trade-1",
+      },
+    });
+    authState.role = "paid";
+    authState.session = {
+      access_token: "test-access-token",
+    };
     MockEventSource.instances = [];
+    mockedUseAuth.mockImplementation(() => authState);
 
     vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
     vi.stubGlobal(
@@ -338,5 +399,56 @@ describe("TradingBot", () => {
 
     expect(screen.getAllByText("Coinbase").length).toBeGreaterThan(0);
     expect(screen.getByText("SELL")).toBeTruthy();
+  });
+
+  it("submits a buy order for authorized users", async () => {
+    render(<TradingBot />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Place Buy Order" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Place Buy Order" }));
+
+    await waitFor(() => {
+      expect(mockedPlaceTradingOrder).toHaveBeenCalledWith({
+        accessToken: "test-access-token",
+        order: {
+          symbol: "BTC/USDT",
+          side: "BUY",
+          amount: 0.01,
+        },
+      });
+    });
+  });
+
+  it("disables order execution buttons for unauthorized users and shows a tooltip", async () => {
+    authState.role = "member";
+
+    render(<TradingBot />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Place Buy Order" })).toBeTruthy();
+    });
+
+    const placeBuyButton = screen.getByRole("button", { name: "Place Buy Order" });
+    const cancelOrderButton = screen.getByRole("button", { name: "Cancel Order" });
+
+    expect((placeBuyButton as HTMLButtonElement).disabled).toBe(true);
+    expect((cancelOrderButton as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.focus(placeBuyButton.parentElement as HTMLElement);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip").textContent).toContain(
+        "Only paid and admin users can place or cancel live orders."
+      );
+    });
+
+    expect(mockedPlaceTradingOrder).toHaveBeenCalledTimes(0);
   });
 });

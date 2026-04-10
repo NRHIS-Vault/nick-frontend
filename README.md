@@ -54,7 +54,7 @@ npm test
 ```
 - `src/hooks/useChat.test.tsx` mocks both `/chat-history` and the streaming `/chat` endpoint so the hook can be verified without a live worker or LLM provider.
 - `src/components/LeadBot.test.tsx` renders the LeadBot panel, simulates live `EventSource` updates, and verifies the Recent Leads table reflects streamed inserts and repeat-id merges.
-- `src/components/TradingBot.test.tsx` renders the TradingBot panel, simulates live `EventSource` trading updates, and verifies the balance/signal/trade tables refresh without a real exchange connection.
+- `src/components/TradingBot.test.tsx` renders the TradingBot panel, simulates live `EventSource` trading updates, and verifies both the streaming tables and the role-gated order execution controls without a real exchange connection.
 - `src/test/setup.ts` performs shared Testing Library cleanup between hook tests.
 
 Run only the LeadBot coverage while working on the live dashboard table:
@@ -101,6 +101,7 @@ npm test -- src/components/TradingBot.test.tsx
 ## Supabase Profile Schema
 - This frontend now uses a dedicated `public.profiles` table instead of writing billing/role fields directly onto `auth.users`.
 - Apply `supabase/migrations/20260320_create_profiles.sql` to create the table, RLS policies, timestamps, and an `auth.users` trigger that seeds a default profile row for each new account.
+- Apply `supabase/migrations/20260409_paid_trading_roles.sql` on existing databases to extend the role check constraint with the new `paid` role used by trading execution authorization.
 - Required authorization fields:
   - `role text not null default 'member'`
   - `subscription_status text not null default 'inactive'`
@@ -108,7 +109,7 @@ npm test -- src/components/TradingBot.test.tsx
   - `full_name text`
   - `avatar_url text`
 - Current access rule: only `subscription_status = 'active'` unlocks the protected dashboard. Any other value (`inactive`, `trialing`, `past_due`, `canceled`, or `null`) renders the paywall instead.
-- `role` is fetched into `AuthContext` alongside subscription data so future route-level authorization can branch on the same profile row without changing the login flow again.
+- `role` is fetched into `AuthContext` alongside subscription data. Live trading mutations add a second gate on top of the paywall rule: only `role in ('paid', 'admin')` can place or cancel orders.
 
 ## Project structure
 - `src/App.tsx` – app shell with theme, query client, and nested routes per panel.
@@ -161,6 +162,8 @@ npm test -- src/components/TradingBot.test.tsx
 - The worker emits normalized `provider-status`, `balance`, `trade`, `signal`, `heartbeat`, and `stream-error` events. `TradingBot` merges those events into local React state instead of refetching the whole panel on every market tick.
 - The component watches the stream heartbeat and force-reconnects with backoff if the SSE socket goes stale, so the dashboard does not silently stop updating after a network flap.
 - Public exchange market data can still stream without private API credentials. When the backend cannot open a private account channel, the UI keeps the market stream live and surfaces the provider warning inline instead of collapsing into a full-screen error.
+- TradingBot now exposes quick market-order controls plus open-order cancel buttons. When `VITE_API_BASE` is blank it calls the same-origin `/api/trading/orders` alias; otherwise it calls `${VITE_API_BASE}/trading/orders`.
+- Those execution buttons stay visible but disabled for unauthorized users. Tooltips explain that only `paid` and `admin` roles with a real Supabase bearer token can place or cancel live orders.
 
 ## Chat usage
 - `src/components/ChatInterface.tsx` now uses `src/hooks/useChat.ts` instead of a local timeout-based mock response.

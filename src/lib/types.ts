@@ -289,6 +289,46 @@ export interface SaveTradingExchangeKeysResponse {
   message?: string;
 }
 
+export type TradingCreateOrderSide = "BUY" | "SELL";
+export type TradingCreateOrderType = "MARKET" | "LIMIT";
+
+export interface TradingCreateOrderInput {
+  symbol: string;
+  side: TradingCreateOrderSide;
+  amount: number;
+  type?: TradingCreateOrderType;
+  price?: number;
+}
+
+export interface TradingExecuteOrderResponse {
+  ok: boolean;
+  action: "create";
+  exchange: string;
+  symbol: string;
+  side: TradingCreateOrderSide;
+  type: TradingCreateOrderType;
+  amount: number;
+  price: number | null;
+  order: Record<string, unknown>;
+  executedBy?: {
+    userId: string;
+    role: string;
+  };
+}
+
+export interface TradingCancelOrderResponse {
+  ok: boolean;
+  action: "cancel";
+  exchange: string;
+  orderId: string;
+  symbol: string | null;
+  order: Record<string, unknown>;
+  executedBy?: {
+    userId: string;
+    role: string;
+  };
+}
+
 // Customer portal
 export type BillingPeriod = "monthly" | "yearly";
 export type SubscriberStatus = "active" | "paused" | "cancelled";

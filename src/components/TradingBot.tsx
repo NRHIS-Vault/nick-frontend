@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertCircle,
@@ -13,17 +13,20 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { getTradingBotData } from "@/lib/api";
+import { cancelTradingOrder, getTradingBotData, placeTradingOrder } from "@/lib/api";
 import type {
   Trade,
   Signal,
   TradingBalanceUpdate,
+  TradingCreateOrderSide,
   TradingPlatform,
   TradingProviderStatusEvent,
   TradingStreamConnectedPayload,
   TradingStreamErrorEvent,
 } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useToast } from "@/hooks/use-toast";
 import { resolveApiUrl } from "@/lib/apiClient";
 import { config } from "@/lib/config";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const DEFAULT_STREAM_SYMBOLS = ["BTC/USDT", "ETH/USD"];
 const STREAM_HEARTBEAT_TIMEOUT_MS = 45_000;
@@ -49,6 +53,7 @@ const STREAM_RECONNECT_MAX_MS = 15_000;
 const MAX_SIGNAL_ROWS = 8;
 const MAX_TRADE_ROWS = 14;
 const MAX_BALANCE_ROWS = 10;
+const DEFAULT_EXECUTION_AMOUNT = "0.01";
 const STABLE_VALUE_ASSETS = new Set(["USD", "USDT", "USDC", "BUSD", "FDUSD", "TUSD"]);
 
 const parseRequestedSymbols = (value: string) => {
@@ -246,6 +251,8 @@ const upsertPlatformFromBalance = (
 
 const isStableValueAsset = (asset: string) => STABLE_VALUE_ASSETS.has(asset.toUpperCase());
 
+const normalizeTradingSymbol = (value: string) => value.trim().toUpperCase();
+
 const buildTradingStreamUrl = (symbols: string[]) => {
   const params = new URLSearchParams({
     symbols: symbols.join(","),
@@ -296,9 +303,36 @@ const renderSignalIcon = (direction: Signal["direction"]) =>
     <TrendingDown className="h-4 w-4 text-rose-500" />
   );
 
+const renderTradingActionButton = ({
+  button,
+  tooltip,
+}: {
+  button: React.ReactElement;
+  tooltip: string | null;
+}) => {
+  if (!tooltip) {
+    return button;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex cursor-not-allowed" tabIndex={0}>
+          {button}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+};
+
 export default function TradingBot() {
+  const { role, session } = useAuth();
+  const { toast } = useToast();
   const [isActive, setIsActive] = useState(false);
   const [symbolInput, setSymbolInput] = useState(DEFAULT_STREAM_SYMBOLS.join(", "));
+  const [executionSymbol, setExecutionSymbol] = useState(DEFAULT_STREAM_SYMBOLS[0]);
+  const [executionAmount, setExecutionAmount] = useState(DEFAULT_EXECUTION_AMOUNT);
   const [liveTrades, setLiveTrades] = useState<Trade[]>([]);
   const [liveSignals, setLiveSignals] = useState<Signal[]>([]);
   const [liveBalanceUpdates, setLiveBalanceUpdates] = useState<TradingBalanceUpdate[]>([]);
@@ -326,6 +360,12 @@ export default function TradingBot() {
       setIsActive(data.botStatus.active);
     }
   }, [data?.botStatus]);
+
+  useEffect(() => {
+    setExecutionSymbol((currentSymbol) =>
+      currentSymbol.trim() ? currentSymbol : requestedSymbols[0] || DEFAULT_STREAM_SYMBOLS[0]
+    );
+  }, [requestedSymbols]);
 
   useEffect(() => {
     let isUnmounted = false;
@@ -578,11 +618,86 @@ export default function TradingBot() {
   );
   const totalBalance =
     aggregatedPlatformBalance > 0 ? aggregatedPlatformBalance : balances.totalBalance;
+  const normalizedRole = role?.trim().toLowerCase() ?? null;
+  const hasTradingActionRole = normalizedRole === "admin" || normalizedRole === "paid";
+  const hasTradingAccessToken = Boolean(session?.access_token);
+  const tradingActionTooltip = !hasTradingAccessToken
+    ? "Trading actions require a real Supabase bearer token."
+    : hasTradingActionRole
+      ? null
+      : "Only paid and admin users can place or cancel live orders.";
+  const normalizedExecutionSymbol = normalizeTradingSymbol(executionSymbol);
+  const parsedExecutionAmount = Number(executionAmount);
+  const isExecutionAmountValid =
+    Number.isFinite(parsedExecutionAmount) && parsedExecutionAmount > 0;
+  const canSubmitExecutionForm = Boolean(normalizedExecutionSymbol) && isExecutionAmountValid;
+  const isTradingActionBlocked = Boolean(tradingActionTooltip);
   const hasData =
     Boolean(trades.length) ||
     Boolean(signals.length) ||
     Boolean(platforms.length) ||
     Boolean(balanceUpdates.length);
+
+  const placeOrderMutation = useMutation({
+    mutationFn: async (side: TradingCreateOrderSide) => {
+      if (!session?.access_token) {
+        throw new Error("Trading actions require a real Supabase bearer token.");
+      }
+
+      return placeTradingOrder({
+        accessToken: session.access_token,
+        order: {
+          symbol: normalizedExecutionSymbol,
+          side,
+          amount: parsedExecutionAmount,
+        },
+      });
+    },
+    onSuccess: (_response, side) => {
+      toast({
+        title: `${side} order submitted`,
+        description: `${side} market order sent for ${normalizedExecutionSymbol} via the trading worker.`,
+      });
+      void refetch();
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Order submission failed",
+        description:
+          error instanceof Error ? error.message : "Unable to submit the order right now.",
+      });
+    },
+  });
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: async (trade: Trade) => {
+      if (!session?.access_token) {
+        throw new Error("Trading actions require a real Supabase bearer token.");
+      }
+
+      return cancelTradingOrder({
+        accessToken: session.access_token,
+        orderId: trade.id,
+        symbol: normalizeTradingSymbol(trade.pair),
+      });
+    },
+    onSuccess: (_response, trade) => {
+      toast({
+        title: "Cancel request submitted",
+        description: `Cancellation sent for ${trade.pair} (${trade.id}).`,
+      });
+      void refetch();
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Cancel request failed",
+        description:
+          error instanceof Error ? error.message : "Unable to cancel the order right now.",
+      });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -654,35 +769,117 @@ export default function TradingBot() {
         </div>
       </div>
 
-      {/* The EventSource reconnects whenever this debounced symbol list changes, so the worker
-          can rebuild the upstream Binance/Coinbase subscriptions without refreshing the page. */}
-      <Card>
-        <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-end">
-          <div className="flex-1 space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Stream Symbols</p>
-            <Input
-              value={symbolInput}
-              onChange={(event) => setSymbolInput(event.target.value)}
-              placeholder="BTC/USDT, ETH/USD, SOL/USD"
-            />
-            <p className="text-xs text-muted-foreground">
-              Use comma-separated pairs. The worker normalizes them for Binance and Coinbase
-              before opening the upstream WebSockets.
-            </p>
-          </div>
-
-          <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-            <div className="flex items-center gap-2 font-medium">
-              <Radio className="h-4 w-4" />
-              Stream State: {streamStatus}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        {/* The EventSource reconnects whenever this debounced symbol list changes, so the worker
+            can rebuild the upstream Binance/Coinbase subscriptions without refreshing the page. */}
+        <Card>
+          <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-end">
+            <div className="flex-1 space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Stream Symbols</p>
+              <Input
+                value={symbolInput}
+                onChange={(event) => setSymbolInput(event.target.value)}
+                placeholder="BTC/USDT, ETH/USD, SOL/USD"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use comma-separated pairs. The worker normalizes them for Binance and Coinbase
+                before opening the upstream WebSockets.
+              </p>
             </div>
-            <p className="mt-1 text-muted-foreground">
-              Snapshot API loads first, then live SSE updates append balance events, trades, and
-              generated price signals in place.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+
+            <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+              <div className="flex items-center gap-2 font-medium">
+                <Radio className="h-4 w-4" />
+                Stream State: {streamStatus}
+              </div>
+              <p className="mt-1 text-muted-foreground">
+                Snapshot API loads first, then live SSE updates append balance events, trades, and
+                generated price signals in place.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Execution Controls</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Order Symbol</p>
+                <Input
+                  value={executionSymbol}
+                  onChange={(event) => setExecutionSymbol(event.target.value)}
+                  placeholder="BTC/USDT"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Order Amount</p>
+                <Input
+                  value={executionAmount}
+                  onChange={(event) => setExecutionAmount(event.target.value)}
+                  inputMode="decimal"
+                  placeholder="0.01"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              {/* Keep execution controls visible so users understand the capability and the
+                  authorization boundary, but do not let unauthorized users send mutations. */}
+              The worker checks the Supabase bearer token and profile role before it signs any
+              live order request. Only <code className="font-mono">paid</code> and{" "}
+              <code className="font-mono">admin</code> accounts can place or cancel orders.
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {renderTradingActionButton({
+                tooltip: tradingActionTooltip,
+                button: (
+                  <Button
+                    onClick={() => placeOrderMutation.mutate("BUY")}
+                    disabled={
+                      isTradingActionBlocked ||
+                      !canSubmitExecutionForm ||
+                      placeOrderMutation.isPending
+                    }
+                  >
+                    {placeOrderMutation.isPending ? "Submitting..." : "Place Buy Order"}
+                  </Button>
+                ),
+              })}
+              {renderTradingActionButton({
+                tooltip: tradingActionTooltip,
+                button: (
+                  <Button
+                    variant="outline"
+                    onClick={() => placeOrderMutation.mutate("SELL")}
+                    disabled={
+                      isTradingActionBlocked ||
+                      !canSubmitExecutionForm ||
+                      placeOrderMutation.isPending
+                    }
+                  >
+                    {placeOrderMutation.isPending ? "Submitting..." : "Place Sell Order"}
+                  </Button>
+                ),
+              })}
+            </div>
+
+            {!canSubmitExecutionForm ? (
+              <p className="text-xs text-muted-foreground">
+                Enter a normalized symbol and a positive amount before submitting a market order.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Market orders route through <code className="font-mono">POST /trading/orders</code>{" "}
+                and use server-side exchange credentials.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {streamError && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-800">
@@ -900,6 +1097,7 @@ export default function TradingBot() {
                   <TableHead>Amount</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -916,6 +1114,29 @@ export default function TradingBot() {
                     <TableCell>{formatUsd(trade.price)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{trade.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {trade.status === "OPEN"
+                        ? renderTradingActionButton({
+                            tooltip: tradingActionTooltip,
+                            button: (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => cancelOrderMutation.mutate(trade)}
+                                disabled={
+                                  isTradingActionBlocked || cancelOrderMutation.isPending
+                                }
+                              >
+                                {cancelOrderMutation.isPending
+                                  ? "Canceling..."
+                                  : "Cancel Order"}
+                              </Button>
+                            ),
+                          })
+                        : (
+                          <span className="text-xs text-muted-foreground">n/a</span>
+                        )}
                     </TableCell>
                   </TableRow>
                 ))}
