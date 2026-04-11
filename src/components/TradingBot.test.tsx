@@ -32,7 +32,7 @@ const authState = vi.hoisted(() => ({
   role: "paid",
   session: {
     access_token: "test-access-token",
-  },
+  } as { access_token: string } | null,
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -448,6 +448,35 @@ describe("TradingBot", () => {
         "Only paid and admin users can place or cancel live orders."
       );
     });
+
+    expect(mockedPlaceTradingOrder).toHaveBeenCalledTimes(0);
+  });
+
+  it("blocks order execution when the user does not have a real bearer token", async () => {
+    authState.role = "paid";
+    authState.session = null;
+
+    render(<TradingBot />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Place Buy Order" })).toBeTruthy();
+    });
+
+    const placeBuyButton = screen.getByRole("button", { name: "Place Buy Order" });
+
+    expect((placeBuyButton as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.focus(placeBuyButton.parentElement as HTMLElement);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip").textContent).toContain(
+        "Trading actions require a real Supabase bearer token."
+      );
+    });
+
+    fireEvent.click(placeBuyButton);
 
     expect(mockedPlaceTradingOrder).toHaveBeenCalledTimes(0);
   });

@@ -54,7 +54,7 @@ npm test
 ```
 - `src/hooks/useChat.test.tsx` mocks both `/chat-history` and the streaming `/chat` endpoint so the hook can be verified without a live worker or LLM provider.
 - `src/components/LeadBot.test.tsx` renders the LeadBot panel, simulates live `EventSource` updates, and verifies the Recent Leads table reflects streamed inserts and repeat-id merges.
-- `src/components/TradingBot.test.tsx` renders the TradingBot panel, simulates live `EventSource` trading updates, and verifies both the streaming tables and the role-gated order execution controls without a real exchange connection.
+- `src/components/TradingBot.test.tsx` renders the TradingBot panel, simulates live `EventSource` trading updates, and verifies both the streaming tables and the role/token-gated order execution controls without a real exchange connection.
 - `src/test/setup.ts` performs shared Testing Library cleanup between hook tests.
 
 Run only the LeadBot coverage while working on the live dashboard table:
