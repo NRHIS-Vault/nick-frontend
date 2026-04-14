@@ -8,6 +8,8 @@ import {
   LeadBotDateRange,
   LeadBotPlatformFilter,
   LeadBotResponse,
+  NcsControlWorkerActionResponse,
+  NcsStatusResponse,
   SaveTradingExchangeKeysResponse,
   TradingExchangeKeyInput,
   TradingBotResponse,
@@ -27,6 +29,8 @@ export type {
   LeadBotDateRange,
   LeadBotPlatformFilter,
   LeadBotResponse,
+  NcsControlWorkerActionResponse,
+  NcsStatusResponse,
   SaveTradingExchangeKeysResponse,
   TradingExchangeKeyInput,
   TradingBotResponse,
@@ -49,6 +53,40 @@ export const getLeads = () =>
 
 export const getWorkers = () =>
   apiRequest<WorkersResponse>("/workers");
+
+export const getNcsStatus = () =>
+  apiRequest<NcsStatusResponse>("/ncs/status");
+
+const buildNcsControlHeaders = (accessToken?: string) => ({
+  "Content-Type": "application/json",
+  ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+});
+
+export const pauseNcsWorker = ({
+  workerId,
+  accessToken,
+}: {
+  workerId: string;
+  accessToken?: string;
+}) =>
+  apiRequest<NcsControlWorkerActionResponse>("/ncs/pause", {
+    method: "POST",
+    headers: buildNcsControlHeaders(accessToken),
+    body: JSON.stringify({ workerId }),
+  });
+
+export const resumeNcsWorker = ({
+  workerId,
+  accessToken,
+}: {
+  workerId: string;
+  accessToken?: string;
+}) =>
+  apiRequest<NcsControlWorkerActionResponse>("/ncs/resume", {
+    method: "POST",
+    headers: buildNcsControlHeaders(accessToken),
+    body: JSON.stringify({ workerId }),
+  });
 
 export const getBusinessCards = () =>
   apiRequest<BusinessCardsResponse>("/businessCards");

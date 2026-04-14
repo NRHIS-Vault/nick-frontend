@@ -84,6 +84,65 @@ export interface WorkersResponse {
   workers: Worker[];
 }
 
+// NCS worker runtime status
+export type NcsWorkerRuntimeStatus = "idle" | "busy" | "error";
+export type NcsStatusSource = "supabase" | "service" | "stub";
+
+export interface NcsWorkerJob {
+  id: string | null;
+  name: string | null;
+  type: string | null;
+  queue: string | null;
+  progressPct: number | null;
+  details: Record<string, unknown> | null;
+  error: string | null;
+}
+
+export interface NcsWorkerTimestamps {
+  createdAt: string | null;
+  updatedAt: string | null;
+  pausedAt: string | null;
+  lastHeartbeatAt: string | null;
+  lastStartedAt: string | null;
+  lastFinishedAt: string | null;
+}
+
+export interface NcsWorkerStatusRecord {
+  id: string;
+  workerKey: string;
+  name: string;
+  status: NcsWorkerRuntimeStatus;
+  rawStatus: string | null;
+  statusMessage: string | null;
+  isPaused: boolean;
+  source: NcsStatusSource;
+  job: NcsWorkerJob;
+  timestamps: NcsWorkerTimestamps;
+}
+
+export interface NcsStatusSummary {
+  totalWorkers: number;
+  idleWorkers: number;
+  busyWorkers: number;
+  errorWorkers: number;
+  pausedWorkers: number;
+}
+
+export interface NcsStatusResponse {
+  generatedAt: string;
+  source: NcsStatusSource;
+  summary: NcsStatusSummary;
+  workers: NcsWorkerStatusRecord[];
+}
+
+export interface NcsControlWorkerActionResponse {
+  ok: boolean;
+  action: "pause" | "resume";
+  workerId: string;
+  stub: boolean;
+  message: string;
+}
+
 // Business cards
 export type BusinessStatus = "Active" | "Growing" | "Paused";
 

@@ -134,19 +134,24 @@ npm test -- src/components/TradingBot.test.tsx
 - `src/contexts/AppContext.tsx` – sidebar state for mobile; unused imports removed.
 - `src/lib/utils.ts` – `cn` className helper.
 - `src/lib/config.ts` – typed access to env vars with safe fallbacks.
-- `src/lib/api.ts` – lightweight fetch helpers for the dashboard APIs (business stats, leads, workers, cards, LeadBot, TradingBot, customer portal, RHNIS, and encrypted trading key saving).
+- `src/lib/api.ts` – lightweight fetch helpers for the dashboard APIs (business stats, leads, legacy workers, NCS status/control, cards, LeadBot, TradingBot, customer portal, RHNIS, and encrypted trading key saving).
 - `src/lib/apiClient.ts` – generic `apiRequest<T>` wrapper around `fetch` with descriptive errors.
-- `src/lib/types.ts` – shared TypeScript interfaces for all API payloads (stats, leads, workers, trades, customers, identity).
+- `src/lib/types.ts` – shared TypeScript interfaces for all API payloads (stats, leads, workers, NCS runtime status, trades, customers, identity).
 - `src/lib/supabaseClient.ts` – singleton Supabase client plus auth/profile helpers.
 - `src/test/setup.ts` – shared test cleanup for hook/component tests.
 - UI states: `src/components/ui/skeleton.tsx`, `src/components/ui/empty-state.tsx`, `src/components/ui/error-state.tsx` for consistent loading/empty/error rendering.
 - `src/index.css` – Tailwind tokens/base.
 
 ## API mocks
-- Cloudflare Pages Functions (in `nick-site/functions`) expose sample JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, `/rhnisIdentity`.
+- Cloudflare Pages Functions (in `nick-site/functions`) expose sample JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/ncs/status`, `/ncs/pause`, `/ncs/resume`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, `/rhnisIdentity`.
 - Components now use `@tanstack/react-query` + the helpers in `src/lib/api.ts` to fetch those routes, with built-in loading, empty, and error (retry) states.
 - Set `VITE_API_BASE` if the workers live on another domain; leave it blank to call them from the same origin during Pages previews.
 - TradingBot also opens a streaming route: with `VITE_API_BASE` configured it connects to `${VITE_API_BASE}/trading/stream`; with no API base it falls back to same-origin `/api/trading/stream`.
+
+## NCS usage
+- `src/components/WorkerControl.tsx` now queries `/ncs/status` instead of the older `/workers` mock route.
+- The NCS table renders each worker's normalized `status`, job metadata, and operational timestamps so the UI can stay stable even if the backend source changes.
+- Pause and resume buttons call `/ncs/pause` and `/ncs/resume`. Those routes are Day 1 stubs that acknowledge the request without mutating runner state yet.
 
 ## LeadBot usage
 - `src/components/LeadBot.tsx` now queries `/leadBot` with `platform`, `dateRange`, and debounced `search` params instead of rendering a static mock-only panel.
