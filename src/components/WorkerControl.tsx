@@ -154,8 +154,8 @@ const WorkerControl: React.FC = () => {
   });
 
   const handleWorkerAction = (action: WorkerAction, workerId: string) => {
-    // These control routes are intentionally stubs for Day 1. The UI still calls the
-    // real worker endpoints now so the control contract is exercised before orchestration lands.
+    // Pause/resume is asynchronous by design: the UI publishes a control request and the
+    // queue consumer applies the state change after the HTTP request has already returned.
     controlMutation.mutate({
       action,
       workerId,
@@ -363,8 +363,8 @@ const WorkerControl: React.FC = () => {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Idle workers: {summary.idleWorkers}. Pause and resume currently call Day 1 stub workers that
-        acknowledge the control request without changing runner state yet.
+        Idle workers: {summary.idleWorkers}. Pause and resume enqueue control messages, and the NCS
+        consumer applies the worker-state update after it processes the queue batch.
       </p>
     </div>
   );

@@ -133,15 +133,19 @@ describe("WorkerControl", () => {
       ok: true,
       action: "pause",
       workerId: "worker-1",
-      stub: true,
-      message: "Pause worker stub acknowledged. Implement the real control flow in Day 2.",
+      requestId: "request-1",
+      queued: true,
+      stub: false,
+      message: "Pause request queued for worker-1. The NCS control consumer will update worker state shortly.",
     });
     mockedResumeNcsWorker.mockResolvedValue({
       ok: true,
       action: "resume",
       workerId: "worker-2",
-      stub: true,
-      message: "Resume worker stub acknowledged. Implement the real control flow in Day 2.",
+      requestId: "request-2",
+      queued: true,
+      stub: false,
+      message: "Resume request queued for worker-2. The NCS control consumer will update worker state shortly.",
     });
   });
 
@@ -162,7 +166,7 @@ describe("WorkerControl", () => {
     expect(screen.getByText("Exchange timeout")).toBeTruthy();
   });
 
-  it("calls the pause worker stub for active rows", async () => {
+  it("queues a pause request for active rows", async () => {
     render(<WorkerControl />, {
       wrapper: createWrapper(),
     });
@@ -187,7 +191,7 @@ describe("WorkerControl", () => {
     );
   });
 
-  it("calls the resume worker stub for paused rows", async () => {
+  it("queues a resume request for paused rows", async () => {
     render(<WorkerControl />, {
       wrapper: createWrapper(),
     });

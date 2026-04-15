@@ -139,7 +139,9 @@ export interface NcsControlWorkerActionResponse {
   ok: boolean;
   action: "pause" | "resume";
   workerId: string;
-  stub: boolean;
+  requestId: string;
+  queued: boolean;
+  stub?: boolean;
   message: string;
 }
 
