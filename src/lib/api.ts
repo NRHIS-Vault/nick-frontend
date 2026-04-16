@@ -14,6 +14,8 @@ import {
   TradingExchangeKeyInput,
   TradingBotResponse,
   TradingCancelOrderResponse,
+  CustomerPortalAnalyticsResponse,
+  CustomerPortalPlansResponse,
   CustomerPortalResponse,
   RHNISIdentityResponse,
   TradingCreateOrderInput,
@@ -35,6 +37,8 @@ export type {
   TradingExchangeKeyInput,
   TradingBotResponse,
   TradingCancelOrderResponse,
+  CustomerPortalAnalyticsResponse,
+  CustomerPortalPlansResponse,
   CustomerPortalResponse,
   RHNISIdentityResponse,
   TradingCreateOrderInput,
@@ -183,6 +187,12 @@ export const cancelTradingOrder = ({
 
 export const getCustomerPortalData = () =>
   apiRequest<CustomerPortalResponse>("/customerPortal");
+
+export const getCustomerPortalPlans = () =>
+  apiRequest<CustomerPortalPlansResponse>("/customerPortal/plans");
+
+export const getCustomerPortalAnalytics = () =>
+  apiRequest<CustomerPortalAnalyticsResponse>("/customerPortal/analytics");
 
 export const getRHNISIdentity = () =>
   apiRequest<RHNISIdentityResponse>("/rhnisIdentity");

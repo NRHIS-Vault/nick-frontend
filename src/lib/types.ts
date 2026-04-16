@@ -391,54 +391,112 @@ export interface TradingCancelOrderResponse {
 }
 
 // Customer portal
-export type BillingPeriod = "monthly" | "yearly";
-export type SubscriberStatus = "active" | "paused" | "cancelled";
+export type PortalDataSource = "supabase" | "stripe" | "stub" | "mixed";
+export type BillingInterval = "day" | "week" | "month" | "year";
+export type CustomerPortalSubscriberStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "paused"
+  | "cancelled"
+  | "unpaid"
+  | "incomplete";
 
-export interface ServicePlan {
+export interface CustomerPortalPlan {
   id: string;
   name: string;
   description: string;
   price: number;
-  period: BillingPeriod;
+  currency: string;
+  billingInterval: BillingInterval;
+  billingIntervalCount: number;
+  billingPeriodLabel: string;
+  monthlyPriceEquivalent: number;
   features: string[];
-  popular?: boolean;
+  popular: boolean;
   roi: string;
 }
 
-export interface Subscriber {
+export interface CustomerPortalPlansResponse {
+  source: PortalDataSource;
+  updatedAt: string;
+  plans: CustomerPortalPlan[];
+}
+
+export interface CustomerPortalSubscriptionItem {
+  planId: string | null;
+  planName: string;
+  quantity: number;
+  amount: number;
+  currency: string;
+  billingInterval: BillingInterval;
+  billingIntervalCount: number;
+  monthlyRecurringRevenue: number;
+}
+
+export interface CustomerPortalSubscriber {
   id: string;
   name: string;
   email: string;
-  service: string;
+  planId: string | null;
+  planName: string;
   joinDate: string;
-  revenue: number;
-  status: SubscriberStatus;
-}
-
-export interface ServicePerformance {
-  service: string;
-  subscribers: number;
-  progress: number;
-}
-
-export interface RevenueBreakdown {
-  service: string;
+  status: CustomerPortalSubscriberStatus;
   amount: number;
+  currency: string;
+  quantity: number;
+  billingInterval: BillingInterval;
+  billingIntervalCount: number;
+  monthlyRecurringRevenue: number;
+  items: CustomerPortalSubscriptionItem[];
 }
 
-export interface CustomerMetrics {
-  monthlyRevenue: number;
+export interface CustomerPortalOverview {
   activeSubscribers: number;
-  monthlyGrowth: number;
-  rating: number;
+  totalSubscribers: number;
+  mrr: number;
+  arr: number;
+  averageRevenuePerActiveSubscriber: number;
+  trialSubscribers: number;
+  atRiskSubscribers: number;
+}
+
+export interface CustomerPortalStatusDatum {
+  status: CustomerPortalSubscriberStatus;
+  count: number;
+}
+
+export interface CustomerPortalPlanDatum {
+  planId: string;
+  planName: string;
+  activeSubscribers: number;
+  mrr: number;
+  averageMrr: number;
+}
+
+export interface CustomerPortalMonthlyDatum {
+  month: string;
+  label: string;
+  newSubscribers: number;
+  newMrr: number;
+}
+
+export interface CustomerPortalAnalyticsResponse {
+  source: PortalDataSource;
+  computedAt: string;
+  overview: CustomerPortalOverview;
+  statusBreakdown: CustomerPortalStatusDatum[];
+  planBreakdown: CustomerPortalPlanDatum[];
+  monthlySeries: CustomerPortalMonthlyDatum[];
+  subscribers: CustomerPortalSubscriber[];
+  notes: string[];
 }
 
 export interface CustomerPortalResponse {
-  services: ServicePlan[];
-  subscribers: Subscriber[];
-  performance: ServicePerformance[];
-  revenueBreakdown: RevenueBreakdown[];
-  metrics: CustomerMetrics;
+  source: PortalDataSource;
+  computedAt: string;
+  plans: CustomerPortalPlan[];
+  analytics: CustomerPortalAnalyticsResponse;
 }
 
 // RHNIS identity
