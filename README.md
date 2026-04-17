@@ -143,10 +143,16 @@ npm test -- src/components/TradingBot.test.tsx
 - `src/index.css` – Tailwind tokens/base.
 
 ## API mocks
-- Cloudflare Pages Functions (in `nick-site/functions`) expose sample JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/ncs/status`, `/ncs/pause`, `/ncs/resume`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, `/rhnisIdentity`.
+- Cloudflare Pages Functions (in `nick-site/functions`) expose JSON endpoints used by the dashboard: `/businessStats`, `/leadManagement`, `/workers`, `/ncs/status`, `/ncs/pause`, `/ncs/resume`, `/businessCards`, `/leadBot`, `/tradingBot`, `/customerPortal`, and authenticated RHNIS identity routes `/identity` plus legacy `/rhnisIdentity`.
 - Components now use `@tanstack/react-query` + the helpers in `src/lib/api.ts` to fetch those routes, with built-in loading, empty, and error (retry) states.
 - Set `VITE_API_BASE` if the workers live on another domain; leave it blank to call them from the same origin during Pages previews.
 - TradingBot also opens a streaming route: with `VITE_API_BASE` configured it connects to `${VITE_API_BASE}/trading/stream`; with no API base it falls back to same-origin `/api/trading/stream`.
+
+## RHNIS usage
+- `src/components/RHNISIdentity.tsx` calls `/identity` with the current Supabase access token from `AuthContext`.
+- The query is disabled for the local dev fallback account because the worker requires a real bearer token that Supabase can validate.
+- The response is now tab-oriented: `identity`, `beacon`, and `legacy` sections mirror the RHNIS dashboard tabs and drive all rendered values directly.
+- If the authenticated user has no `rhnis_profiles` row, the panel renders an empty state instead of static demo content.
 
 ## NCS usage
 - `src/components/WorkerControl.tsx` now queries `/ncs/status` instead of the older `/workers` mock route.

@@ -194,5 +194,12 @@ export const getCustomerPortalPlans = () =>
 export const getCustomerPortalAnalytics = () =>
   apiRequest<CustomerPortalAnalyticsResponse>("/customerPortal/analytics");
 
-export const getRHNISIdentity = () =>
-  apiRequest<RHNISIdentityResponse>("/rhnisIdentity");
+export const getIdentityData = ({ accessToken }: { accessToken: string }) =>
+  apiRequest<RHNISIdentityResponse>("/identity", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+// Backwards-compatible alias for older imports while the RHNIS panel migrates.
+export const getRHNISIdentity = getIdentityData;

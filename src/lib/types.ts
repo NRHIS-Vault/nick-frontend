@@ -507,23 +507,70 @@ export interface IdentityFeature {
   title: string;
   status: string;
   description: string;
+  createdAt: string | null;
 }
 
 export interface BeaconDatum {
   type: string;
   count: number;
   status: string;
+  createdAt: string | null;
 }
 
 export interface LegacyStats {
   voiceRecordingsMb: number;
   interactionLogsMb: number;
   digitalSignaturesMb: number;
+  totalStorageMb: number;
+}
+
+export interface IdentitySummary {
+  totalFeatures: number;
+  activeFeatures: number;
+  lastUpdatedAt: string | null;
+}
+
+export interface IdentityTabData {
+  summary: IdentitySummary;
+  features: IdentityFeature[];
+}
+
+export interface BeaconSummary {
+  signature: string | null;
+  totalSignals: number;
+  activeStreams: number;
+  recordTypes: number;
+  lastUpdatedAt: string | null;
+}
+
+export interface BeaconTabData {
+  summary: BeaconSummary;
+  data: BeaconDatum[];
+}
+
+export interface LegacyDetail {
+  id: string;
+  label: string;
+  sizeMb: number;
+  status: string;
+  description: string;
+}
+
+export interface LegacyTabData {
+  stats: LegacyStats;
+  details: LegacyDetail[];
+  notes: string[];
+  profileCreatedAt: string | null;
+  lastUpdatedAt: string | null;
 }
 
 export interface RHNISIdentityResponse {
-  identityFeatures: IdentityFeature[];
-  beaconData: BeaconDatum[];
-  legacyStats: LegacyStats;
-  beaconSignature: string;
+  source: "supabase";
+  computedAt: string;
+  userId: string;
+  profileId: string | null;
+  hasProfile: boolean;
+  identity: IdentityTabData;
+  beacon: BeaconTabData;
+  legacy: LegacyTabData;
 }
