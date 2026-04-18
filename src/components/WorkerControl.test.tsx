@@ -1,28 +1,17 @@
-import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NcsStatusResponse } from "@/lib/types";
+import { renderWithProviders } from "@/test/render";
+import { installMockFetch } from "@/test/mockApi";
+import { createNcsControlApi } from "@/test/ncsQueue";
 
 const testMocks = vi.hoisted(() => ({
+  useAuth: vi.fn(),
   toast: vi.fn(),
 }));
 
-vi.mock("@/lib/api", () => ({
-  getNcsStatus: vi.fn(),
-  pauseNcsWorker: vi.fn(),
-  resumeNcsWorker: vi.fn(),
-}));
-
-import { getNcsStatus, pauseNcsWorker, resumeNcsWorker } from "@/lib/api";
-import WorkerControl from "./WorkerControl";
-
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({
-    session: {
-      access_token: "test-access-token",
-    },
-  }),
+  useAuth: testMocks.useAuth,
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -31,9 +20,21 @@ vi.mock("@/hooks/use-toast", () => ({
   }),
 }));
 
-const mockedGetNcsStatus = vi.mocked(getNcsStatus);
-const mockedPauseNcsWorker = vi.mocked(pauseNcsWorker);
-const mockedResumeNcsWorker = vi.mocked(resumeNcsWorker);
+vi.mock("@/lib/config", () => ({
+  config: {
+    apiBase: "",
+    supabaseUrl: "",
+    supabaseAnonKey: "",
+    stripePublishableKey: "",
+    devAuthEmail: "",
+    devAuthPassword: "",
+  },
+}));
+
+import { useAuth } from "@/hooks/use-auth";
+import WorkerControl from "./WorkerControl";
+
+const mockedUseAuth = vi.mocked(useAuth);
 
 const baseResponse: NcsStatusResponse = {
   generatedAt: "2026-04-13T10:05:00.000Z",
@@ -107,81 +108,71 @@ const baseResponse: NcsStatusResponse = {
   ],
 };
 
-const createWrapper = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
+const findWorkerRow = (name: string) => {
+  const row = screen.getByText(name).closest("tr");
+  if (!row) {
+    throw new Error(`Unable to find a table row for ${name}.`);
+  }
 
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  return row;
 };
 
 describe("WorkerControl", () => {
   beforeEach(() => {
     testMocks.toast.mockReset();
-    mockedGetNcsStatus.mockReset();
-    mockedPauseNcsWorker.mockReset();
-    mockedResumeNcsWorker.mockReset();
-
-    mockedGetNcsStatus.mockResolvedValue(baseResponse);
-    mockedPauseNcsWorker.mockResolvedValue({
-      ok: true,
-      action: "pause",
-      workerId: "worker-1",
-      requestId: "request-1",
-      queued: true,
-      stub: false,
-      message: "Pause request queued for worker-1. The NCS control consumer will update worker state shortly.",
-    });
-    mockedResumeNcsWorker.mockResolvedValue({
-      ok: true,
-      action: "resume",
-      workerId: "worker-2",
-      requestId: "request-2",
-      queued: true,
-      stub: false,
-      message: "Resume request queued for worker-2. The NCS control consumer will update worker state shortly.",
-    });
+    mockedUseAuth.mockReset();
+    mockedUseAuth.mockReturnValue({
+      session: {
+        access_token: "test-access-token",
+      },
+    } as unknown as ReturnType<typeof useAuth>);
   });
 
-  it("renders NCS worker rows from the status query", async () => {
-    render(<WorkerControl />, {
-      wrapper: createWrapper(),
-    });
+  it("renders NCS worker rows from the mocked status endpoint", async () => {
+    installMockFetch(
+      createNcsControlApi({
+        initialStatus: baseResponse,
+        expectedAccessToken: "test-access-token",
+      }).handlers
+    );
+
+    renderWithProviders(<WorkerControl />);
 
     await waitFor(() => {
       expect(screen.getByText("LeadBot Runner")).toBeTruthy();
       expect(screen.getByText("Billing Runner")).toBeTruthy();
     });
 
-    expect(mockedGetNcsStatus).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Lead intake sync")).toBeTruthy();
     expect(screen.getByText("Invoice export")).toBeTruthy();
     expect(screen.getByText("Syncing Meta and TikTok leads.")).toBeTruthy();
     expect(screen.getByText("Exchange timeout")).toBeTruthy();
   });
 
-  it("queues a pause request for active rows", async () => {
-    render(<WorkerControl />, {
-      wrapper: createWrapper(),
+  it("updates the UI after queued pause and resume messages are consumed", async () => {
+    const ncsApi = createNcsControlApi({
+      initialStatus: baseResponse,
+      expectedAccessToken: "test-access-token",
     });
+    installMockFetch(ncsApi.handlers);
+
+    renderWithProviders(<WorkerControl />);
 
     await waitFor(() => {
       expect(screen.getByLabelText("Pause LeadBot Runner")).toBeTruthy();
     });
 
+    // Control requests only enqueue work. The row should not change until the test drains
+    // the in-memory queue and the component performs another status fetch.
     fireEvent.click(screen.getByLabelText("Pause LeadBot Runner"));
 
     await waitFor(() => {
-      expect(mockedPauseNcsWorker).toHaveBeenCalledWith({
-        workerId: "worker-1",
-        accessToken: "test-access-token",
-      });
+      expect(ncsApi.getQueuedMessages()).toHaveLength(1);
+    });
+    expect(ncsApi.getQueuedMessages()[0]).toMatchObject({
+      action: "pause",
+      workerId: "worker-1",
+      source: "ncs/pause",
     });
 
     expect(testMocks.toast).toHaveBeenCalledWith(
@@ -189,24 +180,29 @@ describe("WorkerControl", () => {
         title: "Pause request queued",
       })
     );
-  });
 
-  it("queues a resume request for paused rows", async () => {
-    render(<WorkerControl />, {
-      wrapper: createWrapper(),
-    });
+    await ncsApi.consumeAllMessages();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Resume Billing Runner")).toBeTruthy();
+      const leadBotRow = findWorkerRow("LeadBot Runner");
+
+      expect(within(leadBotRow).getByText("Idle")).toBeTruthy();
+      expect(within(leadBotRow).getByText("Paused")).toBeTruthy();
+      expect(
+        within(leadBotRow).getByText("Pause requested via NCS control queue.")
+      ).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByLabelText("Resume Billing Runner"));
+    fireEvent.click(screen.getByLabelText("Resume LeadBot Runner"));
 
     await waitFor(() => {
-      expect(mockedResumeNcsWorker).toHaveBeenCalledWith({
-        workerId: "worker-2",
-        accessToken: "test-access-token",
-      });
+      expect(ncsApi.getQueuedMessages()).toHaveLength(1);
+    });
+    expect(ncsApi.getQueuedMessages()[0]).toMatchObject({
+      action: "resume",
+      workerId: "worker-1",
+      source: "ncs/resume",
     });
 
     expect(testMocks.toast).toHaveBeenCalledWith(
@@ -214,5 +210,18 @@ describe("WorkerControl", () => {
         title: "Resume request queued",
       })
     );
+
+    await ncsApi.consumeAllMessages();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => {
+      const leadBotRow = findWorkerRow("LeadBot Runner");
+
+      expect(within(leadBotRow).getByText("Idle")).toBeTruthy();
+      expect(
+        within(leadBotRow).getByText("Resume requested via NCS control queue.")
+      ).toBeTruthy();
+      expect(within(leadBotRow).queryByText("Paused")).toBeNull();
+    });
   });
 });

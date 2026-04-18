@@ -55,13 +55,20 @@ npm test
 - `src/hooks/useChat.test.tsx` mocks both `/chat-history` and the streaming `/chat` endpoint so the hook can be verified without a live worker or LLM provider.
 - `src/components/LeadBot.test.tsx` renders the LeadBot panel, simulates live `EventSource` updates, and verifies the Recent Leads table reflects streamed inserts and repeat-id merges.
 - `src/components/TradingBot.test.tsx` renders the TradingBot panel, simulates live `EventSource` trading updates, and verifies both the streaming tables and the role/token-gated order execution controls without a real exchange connection.
-- `src/test/setup.ts` performs shared Testing Library cleanup between hook tests.
+- `src/components/WorkerControl.test.tsx` exercises the real dashboard API client against mocked `/ncs/status`, `/ncs/pause`, and `/ncs/resume` routes, then drains the in-memory control queue helper in `src/test/ncsQueue.ts` before verifying the UI refreshes into the queued worker state.
+- `src/components/CustomerPortal.test.tsx` mocks `/customerPortal/plans` and `/customerPortal/analytics` with sample metrics so the portal cards, badges, and subscriber table can be verified without a live Worker backend.
+- `src/components/RHNISIdentity.test.tsx` mocks the authenticated `/identity` response, verifies the bearer token header, and checks the Identity, Beacon, and Legacy tabs against one realistic payload.
+- `src/test/render.tsx` and `src/test/mockApi.ts` provide the shared React Query wrapper and mocked fetch router used by the newer integration-style component tests.
+- `src/test/setup.ts` performs shared Testing Library cleanup and browser API shims for chart-heavy jsdom tests.
 
 Run only the LeadBot coverage while working on the live dashboard table:
 
 ```bash
 npm test -- src/components/LeadBot.test.tsx
 npm test -- src/components/TradingBot.test.tsx
+npm test -- src/components/WorkerControl.test.tsx
+npm test -- src/components/CustomerPortal.test.tsx
+npm test -- src/components/RHNISIdentity.test.tsx
 ```
 
 ## Environment setup
