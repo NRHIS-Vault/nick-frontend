@@ -62,6 +62,7 @@ const LeadManagement: React.FC = () => {
         description="Create a lead or retry after syncing your CRM."
         action={
           <button
+            type="button"
             className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             onClick={() => refetch()}
           >
@@ -77,7 +78,10 @@ const LeadManagement: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <h2 className="text-2xl font-bold text-foreground">Lead Management</h2>
-        <button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+        <button
+          type="button"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+        >
           <Plus size={16} />
           Add Lead
         </button>
@@ -86,8 +90,17 @@ const LeadManagement: React.FC = () => {
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
+          {/* Placeholders disappear on input, so keep explicit labels for both filter controls. */}
+          <label htmlFor="lead-search" className="sr-only">
+            Search leads
+          </label>
+          <Search
+            aria-hidden="true"
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+            size={16}
+          />
           <input
+            id="lead-search"
             type="text"
             placeholder="Search leads..."
             value={searchTerm}
@@ -95,7 +108,11 @@ const LeadManagement: React.FC = () => {
             className="w-full pl-10 pr-4 py-2 bg-surface-muted border border-border rounded-lg text-foreground focus:border-primary focus:outline-none"
           />
         </div>
+        <label htmlFor="lead-status-filter" className="sr-only">
+          Filter leads by status
+        </label>
         <select
+          id="lead-status-filter"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-4 py-2 bg-surface-muted border border-border rounded-lg text-foreground focus:border-primary focus:outline-none"
@@ -112,7 +129,10 @@ const LeadManagement: React.FC = () => {
       {/* Leads Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredLeads.map((lead) => (
-          <div key={lead.id} className="bg-card rounded-lg p-6 border border-border hover:border-primary/50 transition-colors shadow-sm">
+          <article
+            key={lead.id}
+            className="bg-card rounded-lg p-6 border border-border hover:border-primary/50 transition-colors shadow-sm"
+          >
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-foreground font-semibold text-lg">{lead.name}</h3>
@@ -151,14 +171,20 @@ const LeadManagement: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
-              <button className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm">
+              <button
+                type="button"
+                className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+              >
                 Contact
               </button>
-              <button className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-sm">
+              <button
+                type="button"
+                className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-sm"
+              >
                 Quote
               </button>
             </div>
-          </div>
+          </article>
         ))}
       </div>
 

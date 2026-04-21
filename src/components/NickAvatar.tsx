@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, MessageCircle, Minimize2, Maximize2 } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 
 interface NickAvatarProps {
   isFloating?: boolean;
@@ -25,16 +25,12 @@ const NickAvatar: React.FC<NickAvatarProps> = ({ isFloating = false, onToggleCha
     setIsListening(!isListening);
   };
 
-  const toggleMinimize = () => {
-    setIsMinimized(!isMinimized);
-  };
-
   if (isFloating) {
     return (
       <div className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${isMinimized ? 'scale-75' : 'scale-100'}`}>
         <div className="relative">
           <div className={`w-16 h-16 rounded-full overflow-hidden border-2 ${isListening ? 'border-green-400 shadow-lg shadow-green-400/50' : 'border-blue-400 shadow-lg shadow-blue-400/50'} ${isAnimating ? 'animate-pulse' : ''}`}>
-            <img src={avatarUrl} alt="Nick Avatar" className="w-full h-full object-cover" />
+            <img src={avatarUrl} alt="Portrait of Nick" className="w-full h-full object-cover" />
           </div>
           
           {isListening && (
@@ -45,8 +41,11 @@ const NickAvatar: React.FC<NickAvatarProps> = ({ isFloating = false, onToggleCha
           
           <div className="absolute -bottom-2 -right-2 flex gap-1">
             <button
+              type="button"
               onClick={toggleListening}
               className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs ${isListening ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} transition-colors`}
+              aria-label={isListening ? 'Stop voice mode' : 'Start voice mode'}
+              aria-pressed={isListening}
             >
               {isListening ? <MicOff size={12} /> : <Mic size={12} />}
             </button>
@@ -59,7 +58,7 @@ const NickAvatar: React.FC<NickAvatarProps> = ({ isFloating = false, onToggleCha
   return (
     <div className="flex flex-col items-center">
       <div className={`relative w-32 h-32 rounded-full overflow-hidden border-4 ${isListening ? 'border-green-400 shadow-2xl shadow-green-400/50' : 'border-blue-400 shadow-2xl shadow-blue-400/50'} ${isAnimating ? 'animate-pulse' : ''} transition-all duration-300`}>
-        <img src={avatarUrl} alt="Nick Avatar" className="w-full h-full object-cover" />
+        <img src={avatarUrl} alt="Portrait of Nick" className="w-full h-full object-cover" />
         
         {isListening && (
           <div className="absolute inset-0 bg-green-400/20 flex items-center justify-center">
@@ -70,8 +69,10 @@ const NickAvatar: React.FC<NickAvatarProps> = ({ isFloating = false, onToggleCha
       
       <div className="mt-4 flex gap-3">
         <button
+          type="button"
           onClick={toggleListening}
           className={`px-4 py-2 rounded-full font-medium transition-all ${isListening ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+          aria-pressed={isListening}
         >
           {isListening ? 'Stop Listening' : 'Start Listening'}
         </button>

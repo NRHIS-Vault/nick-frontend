@@ -42,7 +42,7 @@ const PaywallContent = () => {
                   <Sparkles className="h-6 w-6 text-primary" />
                   <h2 className="mt-4 text-lg font-semibold">Current account role</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    <span className="rounded bg-primary/10 px-2 py-1 font-mono text-primary">
+                    <span className="inline-code-chip">
                       {readableRole}
                     </span>
                   </p>
@@ -52,7 +52,7 @@ const PaywallContent = () => {
                   <Lock className="h-6 w-6 text-primary" />
                   <h2 className="mt-4 text-lg font-semibold">Subscription status</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    <span className="rounded bg-primary/10 px-2 py-1 font-mono text-primary">
+                    <span className="inline-code-chip">
                       {readableSubscriptionStatus}
                     </span>
                   </p>
@@ -75,7 +75,7 @@ const PaywallContent = () => {
                 <div className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
                   Once the billing flow lands, this screen will redirect subscribed users back into
                   the dashboard automatically as soon as `subscription_status` becomes
-                  <code className="mx-1 rounded bg-primary/10 px-2 py-1 text-primary">active</code>.
+                  <code className="mx-1 inline-code-chip">active</code>.
                 </div>
 
                 <Button type="button" className="w-full" disabled>

@@ -221,13 +221,19 @@ const ResetPasswordContent = () => {
                 <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground">
                   <p>
                     Remembered your password?{" "}
-                    <Link to="/login" className="font-medium text-primary hover:text-primary/80">
+                    <Link
+                      to="/login"
+                      className="font-medium text-foreground underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary"
+                    >
                       Back to sign in
                     </Link>
                   </p>
                   <p className="mt-2">
                     Need a new account instead?{" "}
-                    <Link to="/signup" className="font-medium text-primary hover:text-primary/80">
+                    <Link
+                      to="/signup"
+                      className="font-medium text-foreground underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary"
+                    >
                       Create one here
                     </Link>
                   </p>

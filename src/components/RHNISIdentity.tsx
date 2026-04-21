@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Database,
@@ -18,6 +18,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type IdentityTabKey = "identity" | "beacon" | "legacy";
+const identityTabs: IdentityTabKey[] = ["identity", "beacon", "legacy"];
 
 const iconMap: Record<string, LucideIcon> = {
   fingerprint: Fingerprint,
@@ -63,6 +64,11 @@ const SummaryCard = ({
 
 const RHNISIdentity: React.FC = () => {
   const [activeTab, setActiveTab] = useState<IdentityTabKey>("identity");
+  const tabRefs = useRef<Record<IdentityTabKey, HTMLButtonElement | null>>({
+    identity: null,
+    beacon: null,
+    legacy: null,
+  });
   const { session, user, isLoading: isAuthLoading } = useAuth();
   const accessToken = session?.access_token ?? null;
   const isLocalDevSession = user?.id === "local-dev-user";
@@ -147,6 +153,36 @@ const RHNISIdentity: React.FC = () => {
   const profileHealth = identityData.summary.activeFeatures
     ? `${identityData.summary.activeFeatures} active features`
     : "No active features";
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentTab: IdentityTabKey
+  ) => {
+    const currentIndex = identityTabs.indexOf(currentTab);
+    let nextTab: IdentityTabKey | null = null;
+
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        nextTab = identityTabs[(currentIndex + 1) % identityTabs.length];
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextTab = identityTabs[(currentIndex - 1 + identityTabs.length) % identityTabs.length];
+        break;
+      case "Home":
+        nextTab = identityTabs[0];
+        break;
+      case "End":
+        nextTab = identityTabs[identityTabs.length - 1];
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    setActiveTab(nextTab);
+    tabRefs.current[nextTab]?.focus();
+  };
 
   return (
     <div className="space-y-6">
@@ -191,9 +227,23 @@ const RHNISIdentity: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex space-x-1 rounded-lg border border-border bg-surface-muted p-1">
+      <div
+        className="flex space-x-1 rounded-lg border border-border bg-surface-muted p-1"
+        role="tablist"
+        aria-label="Identity views"
+      >
         <button
+          ref={(node) => {
+            tabRefs.current.identity = node;
+          }}
+          id="identity-tab"
+          type="button"
           onClick={() => setActiveTab("identity")}
+          onKeyDown={(event) => handleTabKeyDown(event, "identity")}
+          role="tab"
+          aria-selected={activeTab === "identity"}
+          aria-controls="identity-panel"
+          tabIndex={activeTab === "identity" ? 0 : -1}
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === "identity"
               ? "bg-primary text-primary-foreground"
@@ -203,7 +253,17 @@ const RHNISIdentity: React.FC = () => {
           Identity
         </button>
         <button
+          ref={(node) => {
+            tabRefs.current.beacon = node;
+          }}
+          id="beacon-tab"
+          type="button"
           onClick={() => setActiveTab("beacon")}
+          onKeyDown={(event) => handleTabKeyDown(event, "beacon")}
+          role="tab"
+          aria-selected={activeTab === "beacon"}
+          aria-controls="beacon-panel"
+          tabIndex={activeTab === "beacon" ? 0 : -1}
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === "beacon"
               ? "bg-primary text-primary-foreground"
@@ -213,7 +273,17 @@ const RHNISIdentity: React.FC = () => {
           Beacon
         </button>
         <button
+          ref={(node) => {
+            tabRefs.current.legacy = node;
+          }}
+          id="legacy-tab"
+          type="button"
           onClick={() => setActiveTab("legacy")}
+          onKeyDown={(event) => handleTabKeyDown(event, "legacy")}
+          role="tab"
+          aria-selected={activeTab === "legacy"}
+          aria-controls="legacy-panel"
+          tabIndex={activeTab === "legacy" ? 0 : -1}
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === "legacy"
               ? "bg-primary text-primary-foreground"
@@ -225,7 +295,12 @@ const RHNISIdentity: React.FC = () => {
       </div>
 
       {activeTab === "identity" && (
-        <div className="space-y-6">
+        <section
+          id="identity-panel"
+          role="tabpanel"
+          aria-labelledby="identity-tab"
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <SummaryCard
               label="Identity Features"
@@ -284,11 +359,16 @@ const RHNISIdentity: React.FC = () => {
               description="This profile exists, but no identity feature rows were returned."
             />
           )}
-        </div>
+        </section>
       )}
 
       {activeTab === "beacon" && (
-        <div className="space-y-6">
+        <section
+          id="beacon-panel"
+          role="tabpanel"
+          aria-labelledby="beacon-tab"
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <SummaryCard
               label="Signature"
@@ -343,11 +423,16 @@ const RHNISIdentity: React.FC = () => {
               description="This profile exists, but no beacon propagation rows were returned."
             />
           )}
-        </div>
+        </section>
       )}
 
       {activeTab === "legacy" && (
-        <div className="space-y-6">
+        <section
+          id="legacy-panel"
+          role="tabpanel"
+          aria-labelledby="legacy-tab"
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <SummaryCard
               label="Total Storage"
@@ -415,7 +500,7 @@ const RHNISIdentity: React.FC = () => {
               </div>
             </div>
           ) : null}
-        </div>
+        </section>
       )}
     </div>
   );

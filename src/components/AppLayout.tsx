@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { type User } from '@supabase/supabase-js';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -103,6 +103,7 @@ const LayoutShell: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const navigationTriggerRef = useRef<HTMLButtonElement>(null);
 
   const userEmail = user?.email ?? 'Unknown user';
   const userDisplayName = getUserDisplayName(user);
@@ -141,51 +142,56 @@ const LayoutShell: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20 text-foreground transition-colors">
-      {/* Hero Section */}
-      <div className="relative h-64 overflow-hidden">
-        <img src={heroImage} alt="RHNIS Command Center" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-strong/85 to-brand/70"></div>
-        <div className="absolute inset-0 flex items-center">
-          <div className="container mx-auto px-6">
-            <div className="max-w-2xl space-y-4">
-              <h1 className="text-4xl font-bold text-foreground drop-shadow-sm md:text-5xl">
-                RHNIS Control Center
-              </h1>
-              <p className="text-lg text-foreground/80">
-                Right Hand Nick Identity System - Your AI-powered business automation platform
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <Link
-                  to="/chat"
-                  className="rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition-colors hover:bg-primary/90"
-                >
-                  Talk to Nick
-                </Link>
-                <Link
-                  to="/rhnis"
-                  className="rounded-lg border border-border bg-background px-6 py-3 font-semibold text-foreground transition-colors hover:bg-surface-muted"
-                >
-                  View Identity
-                </Link>
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
+      <header>
+        {/* Hero Section */}
+        <div className="relative h-64 overflow-hidden">
+          <img src={heroImage} alt="RHNIS Command Center" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-brand-strong/85 to-brand/70"></div>
+          <div className="absolute inset-0 flex items-center">
+            <div className="container mx-auto px-6">
+              <div className="max-w-2xl space-y-4">
+                <h1 className="text-4xl font-bold text-foreground drop-shadow-sm md:text-5xl">
+                  RHNIS Control Center
+                </h1>
+                <p className="text-lg text-foreground/80">
+                  Right Hand Nick Identity System - Your AI-powered business automation platform
+                </p>
+                <div className="flex flex-wrap gap-4">
+                  <Link
+                    to="/chat"
+                    className="rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition-colors hover:bg-primary/90"
+                  >
+                    Talk to Nick
+                  </Link>
+                  <Link
+                    to="/rhnis"
+                    className="rounded-lg border border-border bg-background px-6 py-3 font-semibold text-foreground transition-colors hover:bg-surface-muted"
+                  >
+                    View Identity
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Navigation */}
-      <div className="sticky top-0 z-40 border-b border-border bg-surface">
-        <div className="container mx-auto px-6">
-          <div className="flex h-16 items-center justify-between gap-4">
-            <div className="flex min-w-0 flex-1 items-center gap-4 2xl:gap-8">
-              <div className="flex shrink-0 items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                  <Bot className="text-primary-foreground" size={20} />
+        {/* Navigation */}
+        <div className="sticky top-0 z-40 border-b border-border bg-surface">
+          <div className="container mx-auto px-6">
+            <div className="flex h-16 items-center justify-between gap-4">
+              <div className="flex min-w-0 flex-1 items-center gap-4 2xl:gap-8">
+                <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                    <Bot className="text-primary-foreground" size={20} />
+                  </div>
+                  <span className="text-lg font-bold text-foreground">RHNIS</span>
                 </div>
-                <span className="text-lg font-bold text-foreground">RHNIS</span>
-              </div>
 
-              <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-1 2xl:flex [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+                <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-1 2xl:flex [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
                   {menuItems.map((item) => (
                     <Link
                       key={item.id}
@@ -202,74 +208,95 @@ const LayoutShell: React.FC = () => {
                     </Link>
                   ))}
                 </nav>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <button
-                onClick={toggleTheme}
-                className="rounded-full border border-border p-2 text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-                aria-label="Toggle theme"
-              >
-                {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-              </button>
-              <button className="hidden p-2 text-muted-foreground transition-colors hover:text-foreground sm:block">
-                <Bell size={20} />
-              </button>
-
-              <div className="hidden 2xl:block">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex shrink-0 items-center gap-3 rounded-full border border-border bg-card/70 py-1.5 pl-1.5 pr-3 transition-colors hover:border-foreground/30 hover:bg-card">
-                      <Avatar size="sm" className="border-primary/15 bg-primary/10">
-                        <AvatarImage src={userAvatarUrl} alt={userDisplayName} />
-                        <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                          {userInitials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="hidden min-w-0 text-left lg:block">
-                        <p className="max-w-40 truncate text-sm font-medium text-foreground">{userEmail}</p>
-                        <p className="text-xs text-muted-foreground">Signed in</p>
-                      </div>
-                      <ChevronDown size={16} className="text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64">
-                    <DropdownMenuLabel className="space-y-1">
-                      <p className="truncate font-medium text-foreground">{userDisplayName}</p>
-                      <p className="truncate text-xs font-normal text-muted-foreground">
-                        {userSecondaryLabel}
-                      </p>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => {
-                        void handleSignOut();
-                      }}
-                      disabled={isSigningOut}
-                      className="gap-2 text-destructive focus:text-destructive"
-                    >
-                      <LogOut size={16} />
-                      {isSigningOut ? 'Signing out...' : 'Sign out'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
 
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 text-muted-foreground transition-colors hover:text-foreground 2xl:hidden"
-                aria-label="Open navigation drawer"
-              >
-                <Menu size={20} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="rounded-full border border-border p-2 text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                  aria-label="Toggle theme"
+                >
+                  {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                </button>
+                <button
+                  type="button"
+                  className="hidden p-2 text-muted-foreground transition-colors hover:text-foreground sm:block"
+                  aria-label="Notifications coming soon"
+                >
+                  <Bell size={20} />
+                </button>
+
+                <div className="hidden 2xl:block">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex shrink-0 items-center gap-3 rounded-full border border-border bg-card/70 py-1.5 pl-1.5 pr-3 transition-colors hover:border-foreground/30 hover:bg-card"
+                        aria-label={`Open account menu for ${userDisplayName}`}
+                      >
+                        <Avatar size="sm" className="border-primary/15 bg-primary/10">
+                          <AvatarImage src={userAvatarUrl} alt={userDisplayName} />
+                          <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                            {userInitials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="hidden min-w-0 text-left lg:block">
+                          <p className="max-w-40 truncate text-sm font-medium text-foreground">{userEmail}</p>
+                          <p className="text-xs text-muted-foreground">Signed in</p>
+                        </div>
+                        <ChevronDown size={16} className="text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      <DropdownMenuLabel className="space-y-1">
+                        <p className="truncate font-medium text-foreground">{userDisplayName}</p>
+                        <p className="truncate text-xs font-normal text-muted-foreground">
+                          {userSecondaryLabel}
+                        </p>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          void handleSignOut();
+                        }}
+                        disabled={isSigningOut}
+                        className="gap-2 text-destructive focus:text-destructive"
+                      >
+                        <LogOut size={16} />
+                        {isSigningOut ? 'Signing out...' : 'Sign out'}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <button
+                  ref={navigationTriggerRef}
+                  type="button"
+                  onClick={() => setSidebarOpen(true)}
+                  className="p-2 text-muted-foreground transition-colors hover:text-foreground 2xl:hidden"
+                  aria-label="Open navigation drawer"
+                >
+                  <Menu size={20} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Navigation Drawer */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-[min(24rem,92vw)] border-border bg-surface p-0">
+        <SheetContent
+          side="left"
+          className="w-[min(24rem,92vw)] border-border bg-surface p-0"
+          onCloseAutoFocus={(event) => {
+            // The drawer opens from a plain button instead of <SheetTrigger>, so we
+            // restore focus manually when the sheet closes.
+            event.preventDefault();
+            navigationTriggerRef.current?.focus();
+          }}
+        >
           <div className="flex h-full flex-col">
             <SheetHeader className="border-b border-border px-6 pb-5 pt-6 pr-14">
               <SheetTitle className="text-left text-foreground">Navigation</SheetTitle>
@@ -314,6 +341,7 @@ const LayoutShell: React.FC = () => {
 
             <div className="space-y-2 border-t border-border px-4 py-4">
               <button
+                type="button"
                 onClick={() => {
                   toggleTheme();
                   closeSidebar();
@@ -324,6 +352,7 @@ const LayoutShell: React.FC = () => {
                 {theme === 'light' ? 'Dark theme' : 'Light theme'}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   void handleSignOut();
                 }}
@@ -338,16 +367,20 @@ const LayoutShell: React.FC = () => {
         </SheetContent>
       </Sheet>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-6 py-8">
+      {/* Keep the routed view inside a named landmark so skip links and screen-reader navigation
+          jump directly to the dashboard content instead of replaying the shell each time. */}
+      <main id="main-content" tabIndex={-1} className="container mx-auto px-6 py-8">
         <Outlet />
-      </div>
+      </main>
 
       {/* Floating Nick Avatar */}
       <NickAvatar isFloating={true} />
 
       {/* Status Bar */}
-      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-surface p-4">
+      <footer
+        aria-label="System status"
+        className="fixed bottom-0 left-0 right-0 border-t border-border bg-surface p-4"
+      >
         <div className="container mx-auto flex items-center justify-between text-sm">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -361,7 +394,7 @@ const LayoutShell: React.FC = () => {
           </div>
           <div className="text-muted-foreground">Last sync: {new Date().toLocaleTimeString()}</div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 };

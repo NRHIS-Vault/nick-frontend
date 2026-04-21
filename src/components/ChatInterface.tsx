@@ -50,6 +50,7 @@ const ChatInterface: React.FC = () => {
             type="button"
             disabled={isStreaming}
             className="p-2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Voice playback controls"
           >
             <Volume2 size={16} />
           </button>
@@ -57,6 +58,7 @@ const ChatInterface: React.FC = () => {
             type="button"
             disabled={isStreaming}
             className="p-2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Translation language controls"
           >
             <Languages size={16} />
           </button>
@@ -64,7 +66,15 @@ const ChatInterface: React.FC = () => {
       </div>
 
       {/* Message bubbles use separate alignment and color treatments for user vs assistant. */}
-      <div className="flex-1 space-y-4 overflow-y-auto bg-background/40 px-4 py-4">
+      {/* Treat the transcript as a live log so screen readers hear new assistant replies
+          without losing their place inside the rest of the page. */}
+      <div
+        className="flex-1 space-y-4 overflow-y-auto bg-background/40 px-4 py-4"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-busy={isStreaming}
+      >
         {messages.map((message) => {
           const isUser = message.role === "user";
 
@@ -146,7 +156,7 @@ const ChatInterface: React.FC = () => {
             {error}
           </div>
         )}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} aria-hidden="true" />
       </div>
 
       {/* The form submits to the streaming hook and stays disabled while a response is in flight. */}
@@ -161,10 +171,16 @@ const ChatInterface: React.FC = () => {
                 ? "bg-destructive text-destructive-foreground"
                 : "border border-border bg-surface-muted text-muted-foreground hover:text-foreground"
             } disabled:cursor-not-allowed disabled:opacity-50`}
+            aria-label={isListening ? "Stop voice input" : "Start voice input"}
+            aria-pressed={isListening}
           >
             <Mic size={16} />
           </button>
+          <label htmlFor="nick-chat-input" className="sr-only">
+            Message Nick
+          </label>
           <input
+            id="nick-chat-input"
             type="text"
             value={inputText}
             onChange={(event) => setInputText(event.target.value)}
@@ -176,6 +192,7 @@ const ChatInterface: React.FC = () => {
             type="submit"
             disabled={!inputText.trim() || isStreaming}
             className="rounded-full bg-primary p-2 text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Send message"
           >
             <Send size={16} />
           </button>

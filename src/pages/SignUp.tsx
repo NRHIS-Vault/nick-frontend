@@ -294,7 +294,10 @@ const SignUpContent = () => {
                 <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground">
                   <p>
                     Already have an account?{" "}
-                    <Link to="/login" className="font-medium text-primary hover:text-primary/80">
+                    <Link
+                      to="/login"
+                      className="font-medium text-foreground underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary"
+                    >
                       Sign in
                     </Link>
                   </p>
@@ -302,7 +305,7 @@ const SignUpContent = () => {
                     Need to recover an account instead?{" "}
                     <Link
                       to="/reset-password"
-                      className="font-medium text-primary hover:text-primary/80"
+                      className="font-medium text-foreground underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary"
                     >
                       Send a reset email
                     </Link>

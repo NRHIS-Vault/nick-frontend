@@ -320,7 +320,7 @@ const LoginContent = () => {
                   <h2 className="mt-4 text-lg font-semibold">Magic link fallback</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     Email sign-in sends a one-time link to your inbox and returns you to
-                    <span className="mx-1 rounded bg-primary/10 px-2 py-1 font-mono text-primary">
+                    <span className="mx-1 inline-code-chip">
                       {redirectPath}
                     </span>
                     after verification.
@@ -508,7 +508,7 @@ const LoginContent = () => {
                 <p className="text-sm leading-6 text-muted-foreground">
                   Password sign-in calls <code>signInWithPassword</code>. Magic-link sign-in calls
                   <code>signInWithOtp</code> with your email and a redirect back to
-                  <code className="ml-1">{redirectPath}</code>. In local Vite development, the page
+                  <code className="ml-1 inline-code-chip">{redirectPath}</code>. In local Vite development, the page
                   also accepts the dev-only fallback credentials shown above. AuthContext then stores
                   the shared user/session state for the rest of the app.
                 </p>
@@ -516,7 +516,10 @@ const LoginContent = () => {
                 <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground">
                   <p>
                     New here?{" "}
-                    <Link to="/signup" className="font-medium text-primary hover:text-primary/80">
+                    <Link
+                      to="/signup"
+                      className="font-medium text-foreground underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary"
+                    >
                       Create an account
                     </Link>
                   </p>
@@ -524,7 +527,7 @@ const LoginContent = () => {
                     Forgot your password?{" "}
                     <Link
                       to="/reset-password"
-                      className="font-medium text-primary hover:text-primary/80"
+                      className="font-medium text-foreground underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary"
                     >
                       Send a reset email
                     </Link>

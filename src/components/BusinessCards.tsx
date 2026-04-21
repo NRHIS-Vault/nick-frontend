@@ -54,6 +54,7 @@ const BusinessCards: React.FC = () => {
         description="Add a business or connect data to populate this grid."
         action={
           <button
+            type="button"
             className="px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => refetch()}
           >
@@ -65,13 +66,15 @@ const BusinessCards: React.FC = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <ul className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {businesses.map((business) => (
-        <div key={business.id} className={`bg-card rounded-lg overflow-hidden border-2 ${borderClass(business.status)} hover:shadow-lg transition-all duration-300`}>
-          <div className="relative h-48 overflow-hidden">
+        <li key={business.id}>
+          {/* Expose each business card as an article so assistive tech announces it as a distinct result. */}
+          <article className={`bg-card rounded-lg overflow-hidden border-2 ${borderClass(business.status)} hover:shadow-lg transition-all duration-300`}>
+            <div className="relative h-48 overflow-hidden">
             <img 
               src={business.image} 
-              alt={business.name}
+              alt={`${business.name} cover image`}
               className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
             />
             <div className="absolute top-4 right-4">
@@ -79,34 +82,42 @@ const BusinessCards: React.FC = () => {
                 {business.status}
               </span>
             </div>
-          </div>
+            </div>
           
-          <div className="p-6">
-            <h3 className="text-foreground text-lg font-semibold mb-2">{business.name}</h3>
-            <p className="text-muted-foreground text-sm mb-4">{business.description}</p>
+            <div className="p-6">
+              <h3 className="text-foreground text-lg font-semibold mb-2">{business.name}</h3>
+              <p className="text-muted-foreground text-sm mb-4">{business.description}</p>
             
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              {Object.entries(business.stats).map(([key, value]) => (
-                <div key={key} className="text-center">
-                  <p className="text-foreground font-semibold">{formatStatValue(key, value)}</p>
-                  <p className="text-muted-foreground text-xs capitalize">{key}</p>
-                </div>
-              ))}
-            </div>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {Object.entries(business.stats).map(([key, value]) => (
+                  <div key={key} className="text-center">
+                    <p className="text-foreground font-semibold">{formatStatValue(key, value)}</p>
+                    <p className="text-muted-foreground text-xs capitalize">{key}</p>
+                  </div>
+                ))}
+              </div>
             
-            <div className="flex gap-2">
-              <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm">
-                <TrendingUp size={14} />
-                Analytics
-              </button>
-              <button className="flex items-center justify-center px-3 py-2 bg-surface-muted text-foreground rounded-lg hover:bg-surface transition-colors border border-border">
-                <ExternalLink size={14} />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+                >
+                  <TrendingUp size={14} />
+                  Analytics
+                </button>
+                <button
+                  type="button"
+                  className="flex items-center justify-center px-3 py-2 bg-surface-muted text-foreground rounded-lg hover:bg-surface transition-colors border border-border"
+                  aria-label={`View ${business.name} details`}
+                >
+                  <ExternalLink size={14} />
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
+          </article>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 };
 
