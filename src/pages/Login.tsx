@@ -92,8 +92,10 @@ const LoginContent = () => {
     isLoading,
     isConfigured,
     isLocalDevAuthEnabled,
+    isE2EMockAuthEnabled,
     localDevCredentials,
     signInWithLocalDevAccount,
+    signInWithE2EMockAccount,
   } = useAuth();
   const redirectPath = getRedirectPath(location.state as LoginLocationState | null);
   const redirectTo = buildRedirectTo(redirectPath);
@@ -163,6 +165,15 @@ const LoginContent = () => {
     setIsSigningIn(true);
 
     try {
+      if (isE2EMockAuthEnabled) {
+        const mockAuthResult = await signInWithE2EMockAccount(normalizeEmail(email), password);
+
+        if (mockAuthResult.error) {
+          setAuthError(mockAuthResult.error);
+        }
+        return;
+      }
+
       // Step 5a: in local Vite dev mode, accept the local fallback credentials before
       // touching Supabase so the auth UI can be exercised without a seeded remote user.
       const localDevResult = await signInWithLocalDevAccount(normalizeEmail(email), password);
@@ -387,13 +398,23 @@ const LoginContent = () => {
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-5">
-                {!isConfigured && (
+                <CardContent className="space-y-5">
+                {!isConfigured && !isE2EMockAuthEnabled && (
                   <Alert variant="warning">
                     <AlertTitle>Supabase env vars are missing</AlertTitle>
                     <AlertDescription>
                       Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>
                       to enable authentication on this route.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {isE2EMockAuthEnabled && (
+                  <Alert variant="success">
+                    <AlertTitle>E2E mock auth is enabled</AlertTitle>
+                    <AlertDescription>
+                      This route is using the local E2E auth harness instead of Supabase so the
+                      browser tests can create accounts and sign in deterministically.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -474,7 +495,13 @@ const LoginContent = () => {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={(!isConfigured && !isLocalDevAuthEnabled) || isSigningIn || isSendingMagicLink}
+                      disabled={
+                        (!isConfigured &&
+                          !isLocalDevAuthEnabled &&
+                          !isE2EMockAuthEnabled) ||
+                        isSigningIn ||
+                        isSendingMagicLink
+                      }
                     >
                       {isSigningIn ? (
                         <>
@@ -506,11 +533,20 @@ const LoginContent = () => {
                 </form>
 
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Password sign-in calls <code>signInWithPassword</code>. Magic-link sign-in calls
-                  <code>signInWithOtp</code> with your email and a redirect back to
-                  <code className="ml-1 inline-code-chip">{redirectPath}</code>. In local Vite development, the page
-                  also accepts the dev-only fallback credentials shown above. AuthContext then stores
-                  the shared user/session state for the rest of the app.
+                  {isE2EMockAuthEnabled ? (
+                    <>
+                      Password sign-in calls the local E2E mock auth endpoint and restores the same
+                      dashboard redirect path used in the production login flow.
+                    </>
+                  ) : (
+                    <>
+                      Password sign-in calls <code>signInWithPassword</code>. Magic-link sign-in calls
+                      <code>signInWithOtp</code> with your email and a redirect back to
+                      <code className="ml-1 inline-code-chip">{redirectPath}</code>. In local Vite
+                      development, the page also accepts the dev-only fallback credentials shown above.
+                      AuthContext then stores the shared user/session state for the rest of the app.
+                    </>
+                  )}
                 </p>
 
                 <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground">

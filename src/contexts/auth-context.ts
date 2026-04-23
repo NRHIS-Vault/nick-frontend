@@ -23,12 +23,21 @@ export type AuthContextValue = {
   isLoading: boolean;
   isConfigured: boolean;
   isLocalDevAuthEnabled: boolean;
+  isE2EMockAuthEnabled: boolean;
   localDevCredentials: LocalDevCredentials | null;
   signOut: () => Promise<void>;
   signInWithLocalDevAccount: (
     email: string,
     password: string
   ) => Promise<{ matched: boolean; error: string | null }>;
+  signInWithE2EMockAccount: (
+    email: string,
+    password: string
+  ) => Promise<{ error: string | null }>;
+  signUpWithE2EMockAccount: (
+    email: string,
+    password: string
+  ) => Promise<{ error: string | null; message: string | null }>;
 };
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

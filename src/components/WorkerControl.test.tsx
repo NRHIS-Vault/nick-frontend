@@ -28,6 +28,7 @@ vi.mock("@/lib/config", () => ({
     stripePublishableKey: "",
     devAuthEmail: "",
     devAuthPassword: "",
+    e2eMockMode: false,
   },
 }));
 

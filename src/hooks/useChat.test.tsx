@@ -14,6 +14,7 @@ vi.mock("@/lib/config", () => ({
     stripePublishableKey: "",
     devAuthEmail: "",
     devAuthPassword: "",
+    e2eMockMode: false,
   },
 }));
 
@@ -68,9 +69,12 @@ describe("useChat", () => {
       isLoading: false,
       isConfigured: true,
       isLocalDevAuthEnabled: false,
+      isE2EMockAuthEnabled: false,
       localDevCredentials: null,
       signOut: vi.fn(),
       signInWithLocalDevAccount: vi.fn(),
+      signInWithE2EMockAccount: vi.fn(),
+      signUpWithE2EMockAccount: vi.fn(),
     } as AuthContextValue);
   });
 

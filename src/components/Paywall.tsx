@@ -1,13 +1,47 @@
-import { Lock, Sparkles } from "lucide-react";
+import { Lock, LoaderCircle, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/use-auth";
+import { config } from "@/lib/config";
+import { createBillingCheckoutSession } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const PaywallContent = () => {
-  const { role, subscriptionStatus } = useAuth();
+  const { role, session, subscriptionStatus } = useAuth();
   const readableRole = role ?? "member";
   const readableSubscriptionStatus = subscriptionStatus ?? "inactive";
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false);
+
+  const handleCheckout = async () => {
+    if (!session?.access_token) {
+      setCheckoutError("Billing checkout requires an authenticated session.");
+      return;
+    }
+
+    setCheckoutError(null);
+    setIsStartingCheckout(true);
+
+    try {
+      const origin =
+        typeof window === "undefined" ? "" : window.location.origin;
+      const checkoutSession = await createBillingCheckoutSession({
+        accessToken: session.access_token,
+        successUrl: `${origin}/dashboard?checkout=success`,
+        cancelUrl: `${origin}/dashboard?checkout=cancelled`,
+      });
+
+      if (typeof window !== "undefined") {
+        window.location.assign(checkoutSession.checkoutUrl);
+      }
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error ? error.message : "Unable to start the checkout flow."
+      );
+      setIsStartingCheckout(false);
+    }
+  };
 
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
@@ -73,13 +107,40 @@ const PaywallContent = () => {
 
               <CardContent className="space-y-5">
                 <div className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
-                  Once the billing flow lands, this screen will redirect subscribed users back into
-                  the dashboard automatically as soon as `subscription_status` becomes
-                  <code className="mx-1 inline-code-chip">active</code>.
+                  {config.e2eMockMode ? (
+                    <>
+                      The E2E harness replaces the real Stripe redirect with a local sandbox page
+                      that still exercises the paywall-to-checkout-to-dashboard journey end to end.
+                    </>
+                  ) : (
+                    <>
+                      Once the billing flow lands, this screen will redirect subscribed users back into
+                      the dashboard automatically as soon as <code className="mx-1 inline-code-chip">active</code>
+                      is returned for <code className="mx-1 inline-code-chip">subscription_status</code>.
+                    </>
+                  )}
                 </div>
 
-                <Button type="button" className="w-full" disabled>
-                  Subscribe (Week 4 Placeholder)
+                {checkoutError ? (
+                  <p className="text-sm text-destructive">{checkoutError}</p>
+                ) : null}
+
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={() => {
+                    void handleCheckout();
+                  }}
+                  disabled={!config.e2eMockMode || isStartingCheckout}
+                >
+                  {isStartingCheckout ? (
+                    <>
+                      <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                      Redirecting to Stripe
+                    </>
+                  ) : (
+                    "Start Stripe Test Checkout"
+                  )}
                 </Button>
               </CardContent>
             </Card>

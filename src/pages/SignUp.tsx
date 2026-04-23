@@ -59,7 +59,7 @@ const formatAuthError = (message: string) => {
 };
 
 const SignUpContent = () => {
-  const { isConfigured } = useAuth();
+  const { isConfigured, isE2EMockAuthEnabled, signUpWithE2EMockAccount } = useAuth();
 
   // Step 1: keep every field controlled so validation, submission state, and
   // Supabase responses stay synchronized inside a single component.
@@ -99,6 +99,28 @@ const SignUpContent = () => {
     setSuccessMessage(null);
 
     if (!validateForm()) {
+      return;
+    }
+
+    if (isE2EMockAuthEnabled) {
+      setIsSubmitting(true);
+
+      try {
+        const result = await signUpWithE2EMockAccount(normalizeEmail(email), password);
+
+        if (result.error) {
+          setAuthError(result.error);
+          return;
+        }
+
+        setPassword("");
+        setSuccessMessage(
+          result.message ?? "Mock account created. Continue to login to finish the E2E flow."
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+
       return;
     }
 
@@ -191,13 +213,23 @@ const SignUpContent = () => {
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-5">
-                {!isConfigured && (
+                <CardContent className="space-y-5">
+                {!isConfigured && !isE2EMockAuthEnabled && (
                   <Alert variant="warning">
                     <AlertTitle>Supabase env vars are missing</AlertTitle>
                     <AlertDescription>
                       Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>
                       to enable account creation on this route.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {isE2EMockAuthEnabled && (
+                  <Alert variant="success">
+                    <AlertTitle>E2E mock auth is enabled</AlertTitle>
+                    <AlertDescription>
+                      This sign-up form is writing to the local E2E auth harness so browser tests
+                      can register disposable accounts without a live Supabase project.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -274,7 +306,11 @@ const SignUpContent = () => {
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={!isConfigured || isSubmitting}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={(!isConfigured && !isE2EMockAuthEnabled) || isSubmitting}
+                  >
                     {isSubmitting ? (
                       <>
                         <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
@@ -287,8 +323,17 @@ const SignUpContent = () => {
                 </form>
 
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Account creation calls <code>supabase.auth.signUp</code> with your email and
-                  password, then waits for email confirmation before sign-in.
+                  {isE2EMockAuthEnabled ? (
+                    <>
+                      In E2E mock mode this route creates a disposable local account that can sign
+                      in immediately, which keeps the signup flow testable without a live email loop.
+                    </>
+                  ) : (
+                    <>
+                      Account creation calls <code>supabase.auth.signUp</code> with your email and
+                      password, then waits for email confirmation before sign-in.
+                    </>
+                  )}
                 </p>
 
                 <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground">

@@ -2,6 +2,14 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Session, type User } from "@supabase/supabase-js";
 import { config, hasLocalDevAuth, hasSupabaseConfig } from "@/lib/config";
 import { getSupabaseClient, getUserProfile, type Profile as SupabaseProfile } from "@/lib/supabaseClient";
+import {
+  clearMockAuthToken,
+  registerMockAuthAccount,
+  restoreMockAuthSession,
+  signInWithMockAuth,
+  signOutMockAuth,
+  type MockAuthProfile,
+} from "@/lib/mockAuth";
 import { AuthContext } from "./auth-context";
 import { type AuthProfile } from "./auth-context";
 
@@ -55,6 +63,14 @@ const createLocalDevProfile = (email: string): AuthProfile => ({
   subscriptionStatus: "active",
   fullName: email,
   avatarUrl: null,
+});
+
+const createMockAuthProfile = (profile: MockAuthProfile): AuthProfile => ({
+  id: profile.id,
+  role: profile.role,
+  subscriptionStatus: profile.subscriptionStatus,
+  fullName: profile.fullName,
+  avatarUrl: profile.avatarUrl,
 });
 
 const createAuthProfile = (user: User, profile: SupabaseProfile | null): AuthProfile => {
@@ -132,6 +148,7 @@ const clearLocalDevAuth = () => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isConfigured = hasSupabaseConfig();
   const isLocalDevAuthEnabled = hasLocalDevAuth();
+  const isE2EMockAuthEnabled = config.e2eMockMode;
   const localDevEmail = isLocalDevAuthEnabled ? config.devAuthEmail : "";
   const localDevPassword = isLocalDevAuthEnabled ? config.devAuthPassword : "";
   const localDevCredentials = isLocalDevAuthEnabled
@@ -146,7 +163,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(isConfigured || isLocalDevAuthEnabled);
+  const [isAuthLoading, setIsAuthLoading] = useState(
+    isConfigured || isLocalDevAuthEnabled || isE2EMockAuthEnabled
+  );
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoading = isAuthLoading || isProfileLoading;
@@ -160,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     clearLocalDevAuth();
+    clearMockAuthToken();
     setSession(null);
     setUser(null);
     setProfile(null);
@@ -203,6 +223,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let signOutError: Error | null = null;
 
     try {
+      if (isE2EMockAuthEnabled) {
+        await signOutMockAuth();
+      }
+
       // Step 2a: revoke the Supabase session when the app is configured so the current
       // browser session is invalidated before we route the user back to `/login`.
       if (isConfigured) {
@@ -227,7 +251,91 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const signInWithE2EMockAccount = async (email: string, password: string) => {
+    if (!isE2EMockAuthEnabled) {
+      return { error: null };
+    }
+
+    try {
+      const authState = await signInWithMockAuth(email, password);
+      setSession(authState.session);
+      setUser(authState.user);
+      setProfile(createMockAuthProfile(authState.profile));
+      setIsProfileLoading(false);
+      setIsAuthLoading(false);
+      return { error: null };
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to sign in with the E2E mock account.",
+      };
+    }
+  };
+
+  const signUpWithE2EMockAccount = async (email: string, password: string) => {
+    if (!isE2EMockAuthEnabled) {
+      return { error: null, message: null };
+    }
+
+    try {
+      const message = await registerMockAuthAccount(email, password);
+      return { error: null, message };
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to create the E2E mock account.",
+        message: null,
+      };
+    }
+  };
+
   useEffect(() => {
+    if (isE2EMockAuthEnabled) {
+      let isCancelled = false;
+
+      const loadMockSession = async () => {
+        try {
+          const authState = await restoreMockAuthSession();
+
+          if (isCancelled) {
+            return;
+          }
+
+          if (!authState) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setIsProfileLoading(false);
+            setIsAuthLoading(false);
+            return;
+          }
+
+          setSession(authState.session);
+          setUser(authState.user);
+          setProfile(createMockAuthProfile(authState.profile));
+          setIsProfileLoading(false);
+          setIsAuthLoading(false);
+        } catch (error) {
+          if (isCancelled) {
+            return;
+          }
+
+          console.error("Failed to restore the E2E mock auth session.", error);
+          clearAuthState();
+        }
+      };
+
+      void loadMockSession();
+
+      return () => {
+        isCancelled = true;
+      };
+    }
+
     // Step 3: if a local dev auth session already exists, restore it immediately and
     // skip Supabase entirely so frontend work can continue offline.
     if (isLocalDevAuthEnabled && localDevEmail) {
@@ -355,12 +463,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearRefreshTimer();
       subscription.unsubscribe();
     };
-  }, [isConfigured, isLocalDevAuthEnabled, localDevEmail]);
+  }, [isConfigured, isE2EMockAuthEnabled, isLocalDevAuthEnabled, localDevEmail]);
 
   useEffect(() => {
     let isCancelled = false;
 
     const syncAuthorizationProfile = async () => {
+      if (isE2EMockAuthEnabled && session?.user && user) {
+        setProfile((currentProfile) =>
+          currentProfile ?? {
+            id: user.id,
+            role: null,
+            subscriptionStatus: null,
+            fullName: user.email ?? null,
+            avatarUrl: null,
+          }
+        );
+        setIsProfileLoading(false);
+        return;
+      }
+
       if (!user) {
         setProfile(null);
         setIsProfileLoading(false);
@@ -410,7 +532,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       isCancelled = true;
     };
-  }, [isConfigured, localDevEmail, session?.access_token, user]);
+  }, [isConfigured, isE2EMockAuthEnabled, localDevEmail, session?.access_token, user]);
 
   return (
     <AuthContext.Provider
@@ -423,9 +545,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         isConfigured,
         isLocalDevAuthEnabled,
+        isE2EMockAuthEnabled,
         localDevCredentials,
         signOut,
         signInWithLocalDevAccount,
+        signInWithE2EMockAccount,
+        signUpWithE2EMockAccount,
       }}
     >
       {children}

@@ -6,6 +6,7 @@ export type AppEnv = {
   apiBase: string;
   devAuthEmail: string;
   devAuthPassword: string;
+  e2eMockMode: boolean;
 };
 
 const env = import.meta.env as Record<string, string | undefined>;
@@ -23,6 +24,8 @@ export const config: AppEnv = {
   devAuthEmail: env.VITE_DEV_AUTH_EMAIL ?? "dev@nick.local",
   // Local dev-only fallback password for the local test account.
   devAuthPassword: env.VITE_DEV_AUTH_PASSWORD ?? "nick-dev-password",
+  // E2E-only mock mode swaps Supabase/Stripe dependencies for the local test harness.
+  e2eMockMode: (env.VITE_E2E_MOCKS ?? "").toLowerCase() === "true",
 };
 
 // Helper to check if Supabase is configured without throwing.
@@ -31,4 +34,6 @@ export const hasSupabaseConfig = () =>
 
 // Helper to check whether the local dev-only fallback account should be available.
 export const hasLocalDevAuth = () =>
-  import.meta.env.DEV && Boolean(config.devAuthEmail && config.devAuthPassword);
+  import.meta.env.DEV &&
+  !config.e2eMockMode &&
+  Boolean(config.devAuthEmail && config.devAuthPassword);

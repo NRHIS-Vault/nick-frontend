@@ -20,6 +20,7 @@ vi.mock("@/lib/config", () => ({
     stripePublishableKey: "",
     devAuthEmail: "",
     devAuthPassword: "",
+    e2eMockMode: false,
   },
 }));
 
@@ -159,14 +160,14 @@ describe("RHNISIdentity", () => {
     expect(screen.getByText("SIG-ALPHA-9")).toBeTruthy();
     expect(screen.getByText("Stored voice markers for identity replay checks.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Beacon" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Beacon" }));
 
     await waitFor(() => {
       expect(screen.getByText("Conversation Mirrors")).toBeTruthy();
       expect(screen.getByText("Voice Anchors")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Legacy" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Legacy" }));
 
     await waitFor(() => {
       expect(screen.getByText("Legacy Notes")).toBeTruthy();
