@@ -2,7 +2,6 @@
 export type AppEnv = {
   supabaseUrl: string;
   supabaseAnonKey: string;
-  stripePublishableKey: string;
   apiBase: string;
   devAuthEmail: string;
   devAuthPassword: string;
@@ -16,8 +15,6 @@ export const config: AppEnv = {
   supabaseUrl: env.VITE_SUPABASE_URL ?? "",
   // Supabase anon/public key used by the browser client.
   supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY ?? "",
-  // Stripe publishable key for client-side Checkout/Elements.
-  stripePublishableKey: env.VITE_STRIPE_PK ?? "",
   // Base URL for backend/worker API used by this app.
   apiBase: env.VITE_API_BASE ?? "",
   // Local dev-only fallback email for testing the auth UI without a live Supabase user.

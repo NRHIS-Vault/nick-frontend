@@ -1,18 +1,48 @@
 import { Lock, LoaderCircle, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/use-auth";
-import { config } from "@/lib/config";
-import { createBillingCheckoutSession } from "@/lib/billing";
+import {
+  confirmBillingCheckoutSession,
+  createBillingCheckoutSession,
+} from "@/lib/billing";
+import { getCustomerPortalPlans } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
 const PaywallContent = () => {
   const { role, session, subscriptionStatus } = useAuth();
+  const location = useLocation();
   const readableRole = role ?? "member";
   const readableSubscriptionStatus = subscriptionStatus ?? "inactive";
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
+  const [isConfirmingCheckout, setIsConfirmingCheckout] = useState(false);
+
+  const { data: planData } = useQuery({
+    queryKey: ["paywall-plans"],
+    queryFn: getCustomerPortalPlans,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const featuredPlan = useMemo(
+    () => planData?.plans.find((plan) => plan.popular) ?? planData?.plans[0] ?? null,
+    [planData]
+  );
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
+  const checkoutState = searchParams.get("checkout");
+  const checkoutSessionId = searchParams.get("session_id");
 
   const handleCheckout = async () => {
     if (!session?.access_token) {
@@ -24,12 +54,24 @@ const PaywallContent = () => {
     setIsStartingCheckout(true);
 
     try {
+      if (!featuredPlan) {
+        throw new Error("No subscription plan is currently available for checkout.");
+      }
+
       const origin =
         typeof window === "undefined" ? "" : window.location.origin;
+      const successUrl = new URL("/dashboard", origin);
+      successUrl.searchParams.set("checkout", "success");
+      successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+
+      const cancelUrl = new URL("/dashboard", origin);
+      cancelUrl.searchParams.set("checkout", "cancelled");
+
       const checkoutSession = await createBillingCheckoutSession({
         accessToken: session.access_token,
-        successUrl: `${origin}/dashboard?checkout=success`,
-        cancelUrl: `${origin}/dashboard?checkout=cancelled`,
+        planId: featuredPlan.id,
+        successUrl: successUrl.toString(),
+        cancelUrl: cancelUrl.toString(),
       });
 
       if (typeof window !== "undefined") {
@@ -42,6 +84,67 @@ const PaywallContent = () => {
       setIsStartingCheckout(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      !session?.access_token ||
+      checkoutState !== "success" ||
+      !checkoutSessionId ||
+      isConfirmingCheckout
+    ) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const confirmCheckout = async () => {
+      setCheckoutError(null);
+      setIsConfirmingCheckout(true);
+
+      try {
+        await confirmBillingCheckoutSession({
+          accessToken: session.access_token,
+          sessionId: checkoutSessionId,
+        });
+
+        if (isCancelled || typeof window === "undefined") {
+          return;
+        }
+
+        const confirmedUrl = new URL("/dashboard", window.location.origin);
+        confirmedUrl.searchParams.set("checkout", "confirmed");
+        window.location.assign(confirmedUrl.toString());
+      } catch (error) {
+        if (!isCancelled) {
+          setCheckoutError(
+            error instanceof Error
+              ? error.message
+              : "Unable to confirm the completed checkout session."
+          );
+          setIsConfirmingCheckout(false);
+        }
+      }
+    };
+
+    void confirmCheckout();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [checkoutSessionId, checkoutState, isConfirmingCheckout, session?.access_token]);
+
+  const isBusy = isStartingCheckout || isConfirmingCheckout;
+  const statusMessage =
+    checkoutState === "cancelled"
+      ? "Checkout was cancelled before payment completed."
+      : checkoutState === "success"
+        ? "Verifying your completed checkout before reopening the dashboard."
+        : checkoutState === "confirmed"
+          ? "Checkout confirmed. Refreshing your subscription access."
+          : null;
+  const featuredPlanPrice = featuredPlan
+    ? currencyFormatter.format(featuredPlan.monthlyPriceEquivalent)
+    : null;
 
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
@@ -62,12 +165,12 @@ const PaywallContent = () => {
                   Access Control
                 </p>
                 <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-                  Your account is signed in, but this workspace is still behind the paywall.
+                  Your account is signed in, but your subscription access is not active yet.
                 </h1>
                 <p className="max-w-2xl text-lg text-muted-foreground">
-                  Protected routes now check the shared subscription state from AuthContext before
-                  rendering the dashboard. Until checkout ships in Week 4, inactive accounts stop
-                  here instead of loading product pages they cannot use yet.
+                  Protected routes now stop on the paywall until your profile reports an active
+                  subscription. Start checkout here, then the dashboard will reopen automatically
+                  once the completed session is confirmed against Stripe.
                 </p>
               </div>
 
@@ -97,29 +200,36 @@ const PaywallContent = () => {
             <Card className="border-border/60 bg-card/95 shadow-2xl backdrop-blur">
               <CardHeader className="space-y-3">
                 <div className="space-y-1">
-                  <CardTitle>Subscription checkout is coming next</CardTitle>
+                  <CardTitle>
+                    {featuredPlan ? featuredPlan.name : "Subscription checkout"}
+                  </CardTitle>
                   <CardDescription>
-                    This button is intentionally a placeholder for Week 4 while billing is still
-                    being wired into Supabase and Stripe.
+                    {featuredPlan
+                      ? `${featuredPlanPrice} / ${featuredPlan.billingPeriodLabel} for protected dashboard access.`
+                      : "Load a subscription plan, then start checkout."}
                   </CardDescription>
                 </div>
               </CardHeader>
 
               <CardContent className="space-y-5">
                 <div className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
-                  {config.e2eMockMode ? (
+                  {featuredPlan ? (
                     <>
-                      The E2E harness replaces the real Stripe redirect with a local sandbox page
-                      that still exercises the paywall-to-checkout-to-dashboard journey end to end.
+                      {featuredPlan.description}
+                      {featuredPlan.features.length ? (
+                        <span className="mt-3 block">
+                          Includes: {featuredPlan.features.join(", ")}.
+                        </span>
+                      ) : null}
                     </>
                   ) : (
-                    <>
-                      Once the billing flow lands, this screen will redirect subscribed users back into
-                      the dashboard automatically as soon as <code className="mx-1 inline-code-chip">active</code>
-                      is returned for <code className="mx-1 inline-code-chip">subscription_status</code>.
-                    </>
+                    <>Customer portal plan data is loading. Checkout will unlock once a plan is available.</>
                   )}
                 </div>
+
+                {statusMessage ? (
+                  <p className="text-sm text-muted-foreground">{statusMessage}</p>
+                ) : null}
 
                 {checkoutError ? (
                   <p className="text-sm text-destructive">{checkoutError}</p>
@@ -131,15 +241,15 @@ const PaywallContent = () => {
                   onClick={() => {
                     void handleCheckout();
                   }}
-                  disabled={!config.e2eMockMode || isStartingCheckout}
+                  disabled={!featuredPlan || isBusy}
                 >
-                  {isStartingCheckout ? (
+                  {isBusy ? (
                     <>
                       <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                      Redirecting to Stripe
+                      {isConfirmingCheckout ? "Confirming checkout" : "Redirecting to Stripe"}
                     </>
                   ) : (
-                    "Start Stripe Test Checkout"
+                    `Subscribe to ${featuredPlan?.name ?? "this workspace"}`
                   )}
                 </Button>
               </CardContent>

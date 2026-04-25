@@ -42,8 +42,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   // Step 3: users with a valid session still need an active subscription before the
-  // dashboard unlocks. Roles are fetched alongside subscription state in AuthProvider,
-  // but access remains paywall-driven until role-specific authorization is added later.
+  // dashboard unlocks. Route-level access is paywall-driven here, while sensitive worker
+  // mutations such as live trading still enforce stricter backend role checks separately.
   if (!isSubscribed) {
     return <Paywall />;
   }

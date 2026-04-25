@@ -16,7 +16,6 @@ vi.mock("@/lib/config", () => ({
     apiBase: "",
     supabaseUrl: "",
     supabaseAnonKey: "",
-    stripePublishableKey: "",
     devAuthEmail: "",
     devAuthPassword: "",
     e2eMockMode: false,

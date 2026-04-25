@@ -222,7 +222,8 @@ const LayoutShell: React.FC = () => {
                 <button
                   type="button"
                   className="hidden p-2 text-muted-foreground transition-colors hover:text-foreground sm:block"
-                  aria-label="Notifications coming soon"
+                  aria-label="Notifications unavailable in this release"
+                  disabled
                 >
                   <Bell size={20} />
                 </button>

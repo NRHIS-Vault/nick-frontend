@@ -469,7 +469,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let isCancelled = false;
 
     const syncAuthorizationProfile = async () => {
-      if (isE2EMockAuthEnabled && session?.user && user) {
+      if (isE2EMockAuthEnabled && user) {
         setProfile((currentProfile) =>
           currentProfile ?? {
             id: user.id,
