@@ -32,6 +32,7 @@ Required for real auth and worker-backed API calls:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_API_BASE`
+- `VITE_SITE_URL`
 
 Optional:
 
@@ -48,6 +49,7 @@ See [`.env.example`](/Users/josias/Documents/Projects/nick-git/nick-frontend/.en
 - Signed-in users without `subscription_status === "active"` are routed to the paywall.
 - The paywall loads plans from `/customerPortal/plans`, starts Stripe checkout with `/billing/checkout-session`, and confirms the completed session with `/billing/checkout-confirm`.
 - After confirmation, the app reloads so `AuthContext` rehydrates the updated `public.profiles.role` and `subscription_status`.
+- `/reset-password` now handles both the reset-email request and the in-app recovery completion step after Supabase returns the user with a recovery session.
 - The local fallback account is useful for UI work, but worker routes that require a real Supabase bearer token still reject it.
 
 ## Key Panels
@@ -101,7 +103,9 @@ npm run build
 
 - Build a static SPA with `npm run build`
 - Publish the generated `dist/` folder to your frontend hosting target
+- GitHub Actions deployment for this repo lives in [`.github/workflows/deploy.yml`](/Users/josias/Documents/Projects/nick-git/nick-frontend/.github/workflows/deploy.yml)
 - Point `VITE_API_BASE` at the deployed `nick-site` Pages Functions origin when the frontend and backend are hosted separately
+- Set `VITE_SITE_URL=https://dashboard.nick-ai.link` for production auth callbacks and password recovery links
 
 ## Backend Dependencies
 

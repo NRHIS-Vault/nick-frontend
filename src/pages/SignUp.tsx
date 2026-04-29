@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/use-auth";
+import { buildAppUrl } from "@/lib/config";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type FieldErrors = {
@@ -137,6 +138,9 @@ const SignUpContent = () => {
       const { error } = await getSupabaseClient().auth.signUp({
         email: normalizeEmail(email),
         password,
+        options: {
+          emailRedirectTo: buildAppUrl("/dashboard"),
+        },
       });
 
       if (error) {

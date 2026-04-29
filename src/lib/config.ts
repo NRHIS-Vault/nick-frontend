@@ -3,6 +3,7 @@ export type AppEnv = {
   supabaseUrl: string;
   supabaseAnonKey: string;
   apiBase: string;
+  siteUrl: string;
   devAuthEmail: string;
   devAuthPassword: string;
   e2eMockMode: boolean;
@@ -17,6 +18,8 @@ export const config: AppEnv = {
   supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY ?? "",
   // Base URL for backend/worker API used by this app.
   apiBase: env.VITE_API_BASE ?? "",
+  // Canonical dashboard URL used for auth callbacks outside the current browser origin.
+  siteUrl: env.VITE_SITE_URL ?? "https://dashboard.nick-ai.link",
   // Local dev-only fallback email for testing the auth UI without a live Supabase user.
   devAuthEmail: env.VITE_DEV_AUTH_EMAIL ?? "dev@nick.local",
   // Local dev-only fallback password for the local test account.
@@ -28,6 +31,17 @@ export const config: AppEnv = {
 // Helper to check if Supabase is configured without throwing.
 export const hasSupabaseConfig = () =>
   Boolean(config.supabaseUrl && config.supabaseAnonKey);
+
+export const getAppBaseUrl = () => {
+  if (typeof window !== "undefined" && window.location.origin) {
+    return window.location.origin;
+  }
+
+  return config.siteUrl;
+};
+
+export const buildAppUrl = (path: string) =>
+  new URL(path, getAppBaseUrl()).toString();
 
 // Helper to check whether the local dev-only fallback account should be available.
 export const hasLocalDevAuth = () =>

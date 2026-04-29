@@ -9,6 +9,7 @@ import {
   createBillingCheckoutSession,
 } from "@/lib/billing";
 import { getCustomerPortalPlans } from "@/lib/api";
+import { buildAppUrl } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -58,13 +59,11 @@ const PaywallContent = () => {
         throw new Error("No subscription plan is currently available for checkout.");
       }
 
-      const origin =
-        typeof window === "undefined" ? "" : window.location.origin;
-      const successUrl = new URL("/dashboard", origin);
+      const successUrl = new URL(buildAppUrl("/dashboard"));
       successUrl.searchParams.set("checkout", "success");
       successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
 
-      const cancelUrl = new URL("/dashboard", origin);
+      const cancelUrl = new URL(buildAppUrl("/dashboard"));
       cancelUrl.searchParams.set("checkout", "cancelled");
 
       const checkoutSession = await createBillingCheckoutSession({
@@ -111,7 +110,7 @@ const PaywallContent = () => {
           return;
         }
 
-        const confirmedUrl = new URL("/dashboard", window.location.origin);
+        const confirmedUrl = new URL(buildAppUrl("/dashboard"));
         confirmedUrl.searchParams.set("checkout", "confirmed");
         window.location.assign(confirmedUrl.toString());
       } catch (error) {

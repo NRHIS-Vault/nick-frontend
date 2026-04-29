@@ -188,22 +188,34 @@ on public.social_leads(received_at desc);
 -- =========================================================
 -- WORKERS / NCS
 -- =========================================================
-create table if not exists public.workers (
+create table if not exists public.ncs_workers (
   id uuid primary key default gen_random_uuid(),
+  worker_key text not null unique,
   name text not null,
-  type text not null check (type in ('automation', 'monitoring', 'processing')),
-  status text not null check (status in ('running', 'stopped', 'error', 'idle')),
-  description text not null,
-  last_run timestamptz,
-  next_run timestamptz,
-  metrics jsonb not null default '{}'::jsonb,
+  status text not null default 'idle',
+  status_message text,
+  is_paused boolean not null default false,
+  paused_at timestamptz,
+  error_message text,
+  job_id text,
+  job_name text,
+  job_type text,
+  queue_name text,
+  progress_pct numeric(5,2),
+  current_job jsonb,
+  last_heartbeat_at timestamptz,
+  last_started_at timestamptz,
+  last_finished_at timestamptz,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
 
-drop trigger if exists workers_set_updated_at on public.workers;
-create trigger workers_set_updated_at
-before update on public.workers
+create index if not exists ncs_workers_status_idx on public.ncs_workers(status);
+create index if not exists ncs_workers_paused_idx on public.ncs_workers(is_paused);
+
+drop trigger if exists ncs_workers_set_updated_at on public.ncs_workers;
+create trigger ncs_workers_set_updated_at
+before update on public.ncs_workers
 for each row
 execute procedure public.set_updated_at();
 

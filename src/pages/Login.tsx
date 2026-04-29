@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/use-auth";
+import { buildAppUrl } from "@/lib/config";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type FieldErrors = {
@@ -76,11 +77,7 @@ const getRedirectPath = (state: LoginLocationState | null) => {
 };
 
 const buildRedirectTo = (path: string) => {
-  if (typeof window === "undefined") {
-    return path;
-  }
-
-  return new URL(path, window.location.origin).toString();
+  return buildAppUrl(path);
 };
 
 const LoginContent = () => {
